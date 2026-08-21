@@ -6,12 +6,9 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { maxHttpBufferSize: 1e7 }); // Permite archivos de hasta 10MB
 
-const db = new sqlite3.Database('./database.db', (err) => {
-    if (err) console.error("Error BD:", err.message);
-    else console.log("Base de datos SQLite activa.");
-});
+const db = new sqlite3.Database('./database.db');
 
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -19,7 +16,9 @@ db.serialize(() => {
         username TEXT UNIQUE,
         password TEXT,
         avatar TEXT,
-        font_family TEXT DEFAULT 'sans'
+        bubble_color TEXT DEFAULT '#3a86ff',
+        bg_url TEXT DEFAULT '',
+        token TEXT
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS contacts (
@@ -46,9 +45,9 @@ db.serialize(() => {
         receiver_id INTEGER,
         group_id INTEGER,
         content TEXT,
-        font TEXT,
-        is_edited INTEGER DEFAULT 0,
-        is_deleted INTEGER DEFAULT 0,
+        media_url TEXT,
+        is_read INTEGER DEFAULT 0,
+        reactions TEXT DEFAULT '{}',
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 });
@@ -59,226 +58,165 @@ const activeSockets = new Map();
 
 io.on('connection', (socket) => {
 
-    socket.on('auth:login', ({ username, password }) => {
-        db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
-            if (err) return socket.emit('auth:response', { success: false, message: 'Error en servidor' });
-            
-            if (!user) {
-                const defaultAvatar = '🤖';
-                db.run(`INSERT INTO users (username, password, avatar) VALUES (?, ?, ?)`, 
-                    [username, password, defaultAvatar], 
-                    function(err) {
-                        if (err) return socket.emit('auth:response', { success: false, message: 'Error al registrar' });
-                        const newUser = { id: this.lastID, username, avatar: defaultAvatar, font_family: 'sans' };
-                        activeSockets.set(socket.id, newUser);
-                        socket.emit('auth:response', { success: true, user: newUser });
-                        loadUserData(socket, newUser.id);
-                    }
-                );
-            } else {
-                if (user.password !== password) {
-                    return socket.emit('auth:response', { success: false, message: 'Contraseña incorrecta' });
+    // Login por credenciales o por token (Autologin)
+    socket.on('auth:login', ({ username, password, token }) => {
+        if (token) {
+            db.get(`SELECT * FROM users WHERE token = ?`, [token], (err, user) => {
+                if (user) loginSuccess(socket, user);
+                else socket.emit('auth:response', { success: false });
+            });
+        } else {
+            db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
+                if (!user) {
+                    const newToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+                    db.run(`INSERT INTO users (username, password, avatar, token) VALUES (?, ?, '🤖', ?)`, 
+                        [username, password, newToken], function() {
+                        loginSuccess(socket, { id: this.lastID, username, avatar: '🤖', bubble_color: '#3a86ff', token: newToken });
+                    });
+                } else if (user.password === password) {
+                    loginSuccess(socket, user);
+                } else {
+                    socket.emit('auth:response', { success: false, message: 'Contraseña incorrecta' });
                 }
-                const userData = { id: user.id, username: user.username, avatar: user.avatar, font_family: user.font_family };
-                activeSockets.set(socket.id, userData);
-                socket.emit('auth:response', { success: true, user: userData });
-                loadUserData(socket, user.id);
-            }
-        });
+            });
+        }
     });
 
+    function loginSuccess(socket, user) {
+        activeSockets.set(socket.id, user);
+        socket.emit('auth:response', { success: true, user });
+        loadUserData(socket, user.id);
+    }
+
     function loadUserData(socket, userId) {
-        db.all(`SELECT u.id, u.username, u.avatar FROM users u 
-                JOIN contacts c ON u.id = c.contact_id WHERE c.user_id = ?`, [userId], (err, contacts) => {
-            socket.emit('data:contacts', contacts || []);
+        db.all(`SELECT u.id, u.username, u.avatar FROM users u JOIN contacts c ON u.id = c.contact_id WHERE c.user_id = ?`, [userId], (e, c) => {
+            socket.emit('data:contacts', c || []);
         });
 
-        db.all(`SELECT g.id, g.name, g.admin_id FROM groups g 
-                JOIN group_members gm ON g.id = gm.group_id WHERE gm.user_id = ?`, [userId], (err, groups) => {
-            if (groups) {
-                groups.forEach(g => socket.join(`group_${g.id}`));
-                socket.emit('data:groups', groups);
+        db.all(`SELECT g.id, g.name, g.admin_id FROM groups g JOIN group_members gm ON g.id = gm.group_id WHERE gm.user_id = ?`, [userId], (e, g) => {
+            if (g) {
+                g.forEach(grp => socket.join(`group_${grp.id}`));
+                socket.emit('data:groups', g);
             }
         });
     }
 
-    socket.on('user:update_settings', ({ username, avatar, font, password }) => {
-        const currentUser = activeSockets.get(socket.id);
-        if (!currentUser) return;
-
-        let query = `UPDATE users SET avatar = ?, font_family = ?, username = ?`;
-        let params = [avatar, font, username];
-
-        if (password && password.trim() !== "") {
-            query += `, password = ?`;
-            params.push(password);
-        }
-
-        query += ` WHERE id = ?`;
-        params.push(currentUser.id);
-
-        db.run(query, params, function(err) {
-            if (err) {
-                return socket.emit('notification', { message: 'El apodo ya existe o no se pudo cambiar' });
-            }
-            currentUser.username = username;
-            currentUser.avatar = avatar;
-            currentUser.font_family = font;
-            activeSockets.set(socket.id, currentUser);
-            socket.emit('user:settings_updated', { username, avatar, font });
-        });
-    });
-
-    socket.on('contact:add', ({ searchName }) => {
-        const currentUser = activeSockets.get(socket.id);
-        if (!currentUser) return;
-
-        db.get(`SELECT id, username, avatar FROM users WHERE username = ?`, [searchName], (err, targetUser) => {
-            if (!targetUser) return socket.emit('notification', { message: 'Usuario no encontrado' });
-            if (targetUser.id === currentUser.id) return socket.emit('notification', { message: 'No puedes agregarte a ti mismo' });
-
-            db.run(`INSERT OR IGNORE INTO contacts (user_id, contact_id) VALUES (?, ?)`, 
-                [currentUser.id, targetUser.id], (err) => {
-                if (!err) socket.emit('contact:added', targetUser);
-            });
-        });
-    });
-
-    socket.on('group:create', ({ groupName }) => {
-        const currentUser = activeSockets.get(socket.id);
-        if (!currentUser) return;
-
-        db.run(`INSERT INTO groups (name, admin_id) VALUES (?, ?)`, [groupName, currentUser.id], function(err) {
-            if (err) return;
-            const groupId = this.lastID;
-            db.run(`INSERT INTO group_members (group_id, user_id) VALUES (?, ?)`, [groupId, currentUser.id], () => {
-                socket.join(`group_${groupId}`);
-                socket.emit('group:created', { id: groupId, name: groupName, admin_id: currentUser.id });
-            });
-        });
-    });
-
-    socket.on('group:add_member', ({ groupId, username }) => {
-        const currentUser = activeSockets.get(socket.id);
-        db.get(`SELECT admin_id FROM groups WHERE id = ?`, [groupId], (err, group) => {
-            if (!group || group.admin_id !== currentUser.id) {
-                return socket.emit('notification', { message: 'Solo el admin puede añadir personas' });
-            }
-            db.get(`SELECT id FROM users WHERE username = ?`, [username], (err, userToAdd) => {
-                if (!userToAdd) return socket.emit('notification', { message: 'Usuario no encontrado' });
-                db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)`, [groupId, userToAdd.id], () => {
-                    socket.emit('notification', { message: `Añadido ${username} al grupo` });
-                });
-            });
-        });
-    });
-
-    socket.on('group:leave', ({ groupId }) => {
-        const currentUser = activeSockets.get(socket.id);
-        db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, currentUser.id], () => {
-            socket.leave(`group_${groupId}`);
-            socket.emit('group:left', { groupId });
-        });
-    });
-
-    socket.on('chat:load_messages', ({ targetId, isGroup }) => {
-        const currentUser = activeSockets.get(socket.id);
-        if (!currentUser) return;
-
-        let query, params;
+    // Indicador "Escribiendo..."
+    socket.on('typing', ({ targetId, isGroup, isTyping }) => {
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
         if (isGroup) {
-            query = `SELECT m.*, u.username as sender_name FROM messages m 
-                     JOIN users u ON m.sender_id = u.id 
-                     WHERE m.group_id = ? ORDER BY m.timestamp ASC`;
-            params = [targetId];
+            socket.to(`group_${targetId}`).emit('user:typing', { username: u.username, isTyping });
         } else {
-            query = `SELECT m.*, u.username as sender_name FROM messages m 
-                     JOIN users u ON m.sender_id = u.id 
-                     WHERE (m.sender_id = ? AND m.receiver_id = ?) 
-                        OR (m.sender_id = ? AND m.receiver_id = ?) ORDER BY m.timestamp ASC`;
-            params = [currentUser.id, targetId, targetId, currentUser.id];
+            for (let [sId, usr] of activeSockets.entries()) {
+                if (usr.id === parseInt(targetId)) {
+                    io.to(sId).emit('user:typing', { username: u.username, isTyping });
+                    break;
+                }
+            }
+        }
+    });
+
+    // Envío de Mensajes
+    socket.on('message:send', ({ targetId, isGroup, content, mediaUrl }) => {
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+
+        const rId = isGroup ? null : targetId;
+        const gId = isGroup ? targetId : null;
+
+        db.run(`INSERT INTO messages (sender_id, receiver_id, group_id, content, media_url) VALUES (?, ?, ?, ?, ?)`,
+            [u.id, rId, gId, content, mediaUrl || null], function() {
+            const msgData = {
+                id: this.lastID, sender_id: u.id, sender_name: u.username,
+                bubble_color: u.bubble_color || '#3a86ff', receiver_id: rId, group_id: gId,
+                content, media_url: mediaUrl, is_read: 0, reactions: '{}', timestamp: new Date().toISOString()
+            };
+
+            if (isGroup) {
+                io.to(`group_${gId}`).emit('message:received', msgData);
+            } else {
+                socket.emit('message:received', msgData);
+                for (let [sId, usr] of activeSockets.entries()) {
+                    if (usr.id === parseInt(targetId)) {
+                        io.to(sId).emit('message:received', msgData);
+                        break;
+                    }
+                }
+            }
+        });
+    });
+
+    // Cargar historial y marcar como LEÍDO
+    socket.on('chat:load_messages', ({ targetId, isGroup }) => {
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+
+        let q, p;
+        if (isGroup) {
+            q = `SELECT m.*, usr.username as sender_name, usr.bubble_color FROM messages m JOIN users usr ON m.sender_id = usr.id WHERE m.group_id = ? ORDER BY m.timestamp ASC`;
+            p = [targetId];
+        } else {
+            q = `SELECT m.*, usr.username as sender_name, usr.bubble_color FROM messages m JOIN users usr ON m.sender_id = usr.id WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?) ORDER BY m.timestamp ASC`;
+            p = [u.id, targetId, targetId, u.id];
+            
+            db.run(`UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ?`, [targetId, u.id]);
         }
 
-        db.all(query, params, (err, rows) => {
+        db.all(q, p, (err, rows) => {
             socket.emit('chat:history', { targetId, isGroup, messages: rows || [] });
         });
     });
 
-    socket.on('message:send', ({ targetId, isGroup, content }) => {
-        const currentUser = activeSockets.get(socket.id);
-        if (!currentUser) return;
-
-        const font = currentUser.font_family || 'sans';
-        const receiverId = isGroup ? null : targetId;
-        const groupId = isGroup ? targetId : null;
-
-        db.run(`INSERT INTO messages (sender_id, receiver_id, group_id, content, font) VALUES (?, ?, ?, ?, ?)`,
-            [currentUser.id, receiverId, groupId, content, font],
-            function(err) {
-                if (err) return;
-                const msgData = {
-                    id: this.lastID,
-                    sender_id: currentUser.id,
-                    sender_name: currentUser.username,
-                    receiver_id: receiverId,
-                    group_id: groupId,
-                    content,
-                    font,
-                    is_edited: 0,
-                    is_deleted: 0,
-                    timestamp: new Date().toISOString()
-                };
-
-                if (isGroup) {
-                    io.to(`group_${groupId}`).emit('message:received', msgData);
-                } else {
-                    socket.emit('message:received', msgData);
-                    for (let [sId, uData] of activeSockets.entries()) {
-                        if (uData.id === parseInt(targetId)) {
-                            io.to(sId).emit('message:received', msgData);
-                            break;
-                        }
-                    }
-                }
-            }
-        );
+    // Reacciones con Emojis
+    socket.on('message:react', ({ messageId, emoji }) => {
+        db.get(`SELECT reactions FROM messages WHERE id = ?`, [messageId], (e, row) => {
+            if (!row) return;
+            let reactions = JSON.parse(row.reactions || '{}');
+            reactions[emoji] = (reactions[emoji] || 0) + 1;
+            
+            db.run(`UPDATE messages SET reactions = ? WHERE id = ?`, [JSON.stringify(reactions), messageId], () => {
+                io.emit('message:reacted', { messageId, reactions });
+            });
+        });
     });
 
-    socket.on('message:edit', ({ messageId, newContent }) => {
-        const currentUser = activeSockets.get(socket.id);
-        db.run(`UPDATE messages SET content = ?, is_edited = 1 WHERE id = ? AND sender_id = ?`, 
-            [newContent, messageId, currentUser.id], function() {
-            if (this.changes > 0) {
-                io.emit('message:updated', { messageId, newContent });
+    // Actualización de Perfil y Estilos
+    socket.on('user:update_settings', (data) => {
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+
+        db.run(`UPDATE users SET username = ?, avatar = ?, bubble_color = ?, bg_url = ? WHERE id = ?`,
+            [data.username, data.avatar, data.color, data.bgUrl, u.id], () => {
+            Object.assign(u, data);
+            socket.emit('user:settings_updated', data);
+        });
+    });
+
+    socket.on('contact:add', ({ searchName }) => {
+        const u = activeSockets.get(socket.id);
+        db.get(`SELECT id, username, avatar FROM users WHERE username = ?`, [searchName], (e, target) => {
+            if (target && target.id !== u.id) {
+                db.run(`INSERT OR IGNORE INTO contacts (user_id, contact_id) VALUES (?, ?)`, [u.id, target.id], () => {
+                    socket.emit('contact:added', target);
+                });
             }
         });
     });
 
-    socket.on('message:delete', ({ messageId }) => {
-        const currentUser = activeSockets.get(socket.id);
-        db.run(`UPDATE messages SET is_deleted = 1, content = '🚫 Este mensaje fue eliminado' WHERE id = ? AND sender_id = ?`, 
-            [messageId, currentUser.id], function() {
-            if (this.changes > 0) {
-                io.emit('message:deleted', { messageId });
-            }
+    socket.on('group:create', ({ groupName }) => {
+        const u = activeSockets.get(socket.id);
+        db.run(`INSERT INTO groups (name, admin_id) VALUES (?, ?)`, [groupName, u.id], function() {
+            const gId = this.lastID;
+            db.run(`INSERT INTO group_members (group_id, user_id) VALUES (?, ?)`, [gId, u.id], () => {
+                socket.join(`group_${gId}`);
+                socket.emit('group:created', { id: gId, name: groupName, admin_id: u.id });
+            });
         });
-    });
-
-    socket.on('chat:clear_local', ({ targetId, isGroup }) => {
-        const currentUser = activeSockets.get(socket.id);
-        if (isGroup) {
-            db.run(`DELETE FROM messages WHERE group_id = ?`, [targetId]);
-        } else {
-            db.run(`DELETE FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)`,
-                [currentUser.id, targetId, targetId, currentUser.id]);
-        }
-        socket.emit('chat:cleared', { targetId, isGroup });
     });
 
     socket.on('disconnect', () => activeSockets.delete(socket.id));
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor activo en el puerto ${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => console.log("Servidor activo en el puerto " + PORT));

@@ -1,0 +1,21 @@
+{
+  "short_name": "CanaimaLink",
+  "name": "CanaimaLink Messenger",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1041/1041916.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1041/1041916.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0b132b",
+  "theme_color": "#3a86ff",
+  "display": "standalone",
+  "orientation": "portrait"
+}
