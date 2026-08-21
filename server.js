@@ -8,7 +8,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 1e7 }); // Permite archivos de hasta 10MB
 
-const db = new sqlite3.Database('./database.db');
+const dbPath = process.env.RENDER ? '/tmp/database.db' : './database.db';
+const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS users (
