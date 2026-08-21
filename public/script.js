@@ -3,19 +3,24 @@ const socket = io();
 // Registro de PWA (App Instalable)
 let deferredPrompt;
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js');
+    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW error:', err));
 }
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    document.getElementById('btn-install-pwa').classList.remove('hidden');
+    const btnPwa = document.getElementById('btn-install-pwa');
+    if (btnPwa) btnPwa.classList.remove('hidden');
 });
-document.getElementById('btn-install-pwa').addEventListener('click', () => {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt = null;
-    }
-});
+
+const btnInstall = document.getElementById('btn-install-pwa');
+if (btnInstall) {
+    btnInstall.addEventListener('click', () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt = null;
+        }
+    });
+}
 
 let currentUser = null;
 let activeTarget = null;
@@ -24,7 +29,7 @@ let groupsList = [];
 let currentTab = 'chats';
 let typingTimeout = null;
 
-// Cargar ajustes guardados
+// Cargar tema guardado
 document.body.className = localStorage.getItem('canaima_theme') || 'theme-light';
 
 // Autologin por Token
@@ -41,6 +46,7 @@ const messageInput = document.getElementById('message-input');
 const chatHeader = document.getElementById('chat-header');
 const chatFooter = document.getElementById('chat-footer');
 
+// Login
 document.getElementById('btn-login').addEventListener('click', () => {
     const username = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value.trim();
@@ -50,15 +56,16 @@ document.getElementById('btn-login').addEventListener('click', () => {
 socket.on('auth:response', (res) => {
     if (res.success) {
         currentUser = res.user;
-        localStorage.setItem('canaima_token', currentUser.token);
+        if (currentUser.token) localStorage.setItem('canaima_token', currentUser.token);
         authModal.classList.add('hidden');
         document.getElementById('current-user-name').innerText = currentUser.username;
-        document.getElementById('current-user-avatar').innerText = currentUser.avatar;
+        document.getElementById('current-user-avatar').innerText = currentUser.avatar || '🤖';
     } else {
-        document.getElementById('auth-error').innerText = res.message || 'Error de sesión';
+        document.getElementById('auth-error').innerText = res.message || 'Error al iniciar sesión';
     }
 });
 
+// Cargar listas
 socket.on('data:contacts', (d) => { contactsList = d; if (currentTab === 'chats') renderList(); });
 socket.on('data:groups', (d) => { groupsList = d; if (currentTab === 'groups') renderList(); });
 
@@ -85,10 +92,8 @@ function selectChat(item) {
     chatHeader.classList.remove('hidden');
     chatFooter.classList.remove('hidden');
 
-    // Recuperar borrador si existe
     messageInput.value = localStorage.getItem('draft_' + activeTarget.id) || '';
 
-    // Manejo Responsivo Pantalla Móvil
     document.getElementById('app-sidebar').classList.add('mobile-hidden');
     document.getElementById('app-chat-area').classList.remove('mobile-hidden');
 
@@ -100,7 +105,7 @@ document.getElementById('btn-back-chat').addEventListener('click', () => {
     document.getElementById('app-chat-area').classList.add('mobile-hidden');
 });
 
-// Guardado de Borradores automáticos e Indicador "Escribiendo..."
+// Indicador Escribiendo
 messageInput.addEventListener('input', (e) => {
     if (activeTarget) {
         localStorage.setItem('draft_' + activeTarget.id, e.target.value);
@@ -110,36 +115,13 @@ messageInput.addEventListener('input', (e) => {
             socket.emit('typing', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, isTyping: false });
         }, 1500);
     }
-    
-    // Menciones @
-    if (e.target.value.endsWith('@') && activeTarget && activeTarget.isGroup) {
-        showMentionsMenu();
-    } else {
-        document.getElementById('mentions-dropdown').classList.add('hidden');
-    }
 });
-
-function showMentionsMenu() {
-    const dropdown = document.getElementById('mentions-dropdown');
-    dropdown.innerHTML = '';
-    contactsList.forEach(c => {
-        const item = document.createElement('div');
-        item.className = 'mention-item';
-        item.innerText = '@' + c.username;
-        item.addEventListener('click', () => {
-            messageInput.value = messageInput.value.slice(0, -1) + '@' + c.username + ' ';
-            dropdown.classList.add('hidden');
-        });
-        dropdown.appendChild(item);
-    });
-    dropdown.classList.remove('hidden');
-}
 
 socket.on('user:typing', ({ username, isTyping }) => {
     document.getElementById('typing-indicator').innerText = isTyping ? username + ' está escribiendo...' : '';
 });
 
-// Envío de Mensajes
+// Enviar Mensaje
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
@@ -152,7 +134,26 @@ function sendMessage() {
     }
 }
 
-// Envío de Archivos / Fotos
+// Menú Emojis
+const btnEmoji = document.getElementById('btn-emoji');
+const emojiDropdown = document.getElementById('emoji-dropdown');
+
+if (btnEmoji && emojiDropdown) {
+    btnEmoji.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiDropdown.classList.toggle('hidden');
+    });
+
+    document.querySelectorAll('#emoji-dropdown span').forEach(el => {
+        el.addEventListener('click', (evt) => {
+            messageInput.value += evt.target.innerText;
+            emojiDropdown.classList.add('hidden');
+            messageInput.focus();
+        });
+    });
+}
+
+// Adjuntar Imagen
 document.getElementById('btn-attach').addEventListener('click', () => document.getElementById('file-input').click());
 document.getElementById('file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -165,6 +166,7 @@ document.getElementById('file-input').addEventListener('change', (e) => {
     }
 });
 
+// Recibir Mensajes e Historial
 socket.on('chat:history', ({ messages }) => {
     messagesContainer.innerHTML = '';
     messages.forEach(appendMessage);
@@ -177,20 +179,18 @@ socket.on('message:received', (msg) => {
 });
 
 function appendMessage(msg) {
+    if (!currentUser) return;
     const isMe = msg.sender_id === currentUser.id;
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble ' + (isMe ? 'sent' : 'received');
     if (isMe) bubble.style.backgroundColor = msg.bubble_color || '#3a86ff';
 
     let mediaHtml = msg.media_url ? '<img src="' + msg.media_url + '" class="media-preview-img" onclick="openLightbox(\'' + msg.media_url + '\')">' : '';
-    let readStatus = isMe ? (msg.is_read ? ' double-check' : '✓') : '';
 
     bubble.innerHTML = 
-        '<div class="msg-actions"><button onclick="reactMsg(' + msg.id + ', \'❤️\')">❤️</button><button onclick="reactMsg(' + msg.id + ', \'👍\')">👍</button><button onclick="translateMsg(' + msg.id + ')">🌐</button></div>' +
-        (activeTarget.isGroup && !isMe ? '<div class="msg-sender">' + msg.sender_name + '</div>' : '') +
-        '<div class="msg-text" id="text-' + msg.id + '">' + msg.content + '</div>' + mediaHtml +
-        '<div id="reacts-' + msg.id + '" class="reactions-row"></div>' +
-        '<div class="msg-meta">' + new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + ' ' + readStatus + '</div>';
+        (activeTarget && activeTarget.isGroup && !isMe ? '<div class="msg-sender">' + (msg.sender_name || 'Usuario') + '</div>' : '') +
+        '<div class="msg-text">' + msg.content + '</div>' + mediaHtml +
+        '<div class="msg-meta">' + new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
 
     messagesContainer.appendChild(bubble);
 }
@@ -203,55 +203,18 @@ window.openLightbox = (url) => {
 };
 document.getElementById('btn-close-lightbox').addEventListener('click', () => document.getElementById('lightbox-modal').classList.add('hidden'));
 
-// Reacciones
-window.reactMsg = (id, emoji) => socket.emit('message:react', { messageId: id, emoji });
-socket.on('message:reacted', ({ messageId, reactions }) => {
-    const box = document.getElementById('reacts-' + messageId);
-    if (box) {
-        box.innerHTML = Object.entries(reactions).map(([e, c]) => '<span class="reaction-badge">' + e + ' ' + c + '</span>').join('');
-    }
-});
-
-// Traductor Básico integrado
-window.translateMsg = (id) => {
-    const el = document.getElementById('text-' + id);
-    el.innerText = '🌐 [Traducción]: ' + el.innerText;
-};
-
-// Encuesta rápida en grupo
-document.getElementById('btn-poll').addEventListener('click', () => {
-    const q = prompt("Pregunta de la encuesta:");
-    if (q && activeTarget) {
-        socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content: '📊 ENCUESTA: ' + q + '\n1. Sí 👍\n2. No 👎' });
-    }
-});
-
-// Selector de colores y Ajustes
-document.querySelectorAll('.color-circle').forEach(c => {
-    c.addEventListener('click', (e) => {
-        document.querySelectorAll('.color-circle').forEach(x => x.classList.remove('selected'));
-        e.target.classList.add('selected');
-    });
-});
-
+// Modal Ajustes
 document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
 document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
 
-document.getElementById('btn-save-settings').addEventListener('click', () => {
-    const color = document.querySelector('.color-circle.selected').dataset.color;
-    const bgUrl = document.getElementById('bg-url-input').value;
-    const username = document.getElementById('settings-username').value.trim() || currentUser.username;
-    
-    if (bgUrl) document.getElementById('app-chat-area').style.backgroundImage = 'url(' + bgUrl + ')';
-
-    socket.emit('user:update_settings', { username, color, bgUrl, avatar: currentUser.avatar });
+document.getElementById('btn-theme-light').addEventListener('click', () => {
+    document.body.className = 'theme-light';
+    localStorage.setItem('canaima_theme', 'theme-light');
 });
 
-socket.on('user:settings_updated', (d) => {
-    currentUser.username = d.username;
-    currentUser.bubble_color = d.color;
-    document.getElementById('current-user-name').innerText = d.username;
-    settingsModal.classList.add('hidden');
+document.getElementById('btn-theme-dark').addEventListener('click', () => {
+    document.body.className = 'theme-dark';
+    localStorage.setItem('canaima_theme', 'theme-dark');
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => {
@@ -259,8 +222,9 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     location.reload();
 });
 
+// Contactos y Grupos
 document.getElementById('btn-add-contact').addEventListener('click', () => {
-    const name = prompt("Apodo exacto:");
+    const name = prompt("Apodo exacto del amigo:");
     if (name) socket.emit('contact:add', { searchName: name });
 });
 socket.on('contact:added', (c) => { contactsList.push(c); renderList(); });
@@ -270,3 +234,5 @@ document.getElementById('btn-create-group').addEventListener('click', () => {
     if (name) socket.emit('group:create', { groupName: name });
 });
 socket.on('group:created', (g) => { groupsList.push(g); renderList(); });
+
+socket.on('notification', (data) => alert(data.message));
