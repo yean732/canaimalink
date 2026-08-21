@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CanaimaLink</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="theme-light">
+
+    <!-- Modal Login -->
+    <div id="auth-modal" class="modal flex-center">
+        <div class="modal-card">
+            <h2>CanaimaLink</h2>
+            <input type="text" id="auth-username" placeholder="Apodo">
+            <input type="password" id="auth-password" placeholder="Contraseña">
+            <button id="btn-login" class="primary-btn">Ingresar / Crear cuenta</button>
+            <p id="auth-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <div class="user-profile-summary">
+                    <span id="current-user-avatar" class="avatar-box">🤖</span>
+                    <span id="current-user-name">...</span>
+                </div>
+                <button id="btn-open-settings" class="icon-btn">⚙️</button>
+            </header>
+
+            <div class="search-bar-container">
+                <input type="text" id="search-input" placeholder="Buscar...">
+            </div>
+
+            <nav class="nav-tabs">
+                <button id="tab-chats" class="tab-btn active">Chats</button>
+                <button id="tab-groups" class="tab-btn">Grupos</button>
+            </nav>
+
+            <div class="actions-bar">
+                <button id="btn-add-contact" class="action-btn">+ Contacto</button>
+                <button id="btn-create-group" class="action-btn">+ Grupo</button>
+            </div>
+
+            <div id="list-container" class="list-container"></div>
+        </aside>
+
+        <!-- Chat Area -->
+        <main class="chat-area">
+            <header id="chat-header" class="chat-header hidden">
+                <div class="chat-title-info">
+                    <span id="chat-target-avatar" class="avatar-box">👤</span>
+                    <div>
+                        <h3 id="chat-target-name">Selecciona un chat</h3>
+                        <small id="chat-target-subtitle"></small>
+                    </div>
+                </div>
+                <div class="chat-header-actions">
+                    <button id="btn-add-group-member" class="icon-btn hidden">👤+</button>
+                    <button id="btn-leave-group" class="icon-btn hidden">🚪</button>
+                    <button id="btn-clear-chat" class="icon-btn">🗑️</button>
+                </div>
+            </header>
+
+            <div id="messages-container" class="messages-container">
+                <div class="placeholder-chat">
+                    <h2>CanaimaLink</h2>
+                    <p>Comienza a hablar con tus compañeros.</p>
+                </div>
+            </div>
+
+            <footer id="chat-footer" class="chat-footer hidden">
+                <div class="emoji-picker-wrapper">
+                    <button id="btn-emoji" class="icon-btn">😊</button>
+                    <div id="emoji-dropdown" class="emoji-dropdown hidden">
+                        <span>😀</span><span>😂</span><span>😍</span><span>👍</span><span>🔥</span><span>🎉</span><span>❤️</span><span>🚀</span>
+                    </div>
+                </div>
+                <input type="text" id="message-input" placeholder="Escribe un mensaje...">
+                <button id="btn-send" class="send-btn">Enviar</button>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Modal Ajustes -->
+    <div id="settings-modal" class="modal hidden flex-center">
+        <div class="modal-card">
+            <h3>Configuración</h3>
+            <div class="theme-switch-container">
+                <button id="btn-theme-light" class="theme-btn">Claro ☀️</button>
+                <button id="btn-theme-dark" class="theme-btn">Oscuro 🌙</button>
+            </div>
+
+            <label>Avatar:</label>
+            <div class="avatar-selector">
+                <span class="avatar-option">🤖</span>
+                <span class="avatar-option">🦊</span>
+                <span class="avatar-option">🐱</span>
+                <span class="avatar-option">🚀</span>
+                <span class="avatar-option">🎓</span>
+            </div>
+
+            <label>Tipo de Letra:</label>
+            <select id="font-selector">
+                <option value="sans">Sans-serif</option>
+                <option value="serif">Serif</option>
+                <option value="monospace">Monospace</option>
+            </select>
+
+            <input type="password" id="settings-password" placeholder="Nueva contraseña (opcional)">
+
+            <div class="modal-actions">
+                <button id="btn-save-settings" class="action-btn">Guardar</button>
+                <button id="btn-close-settings" class="action-btn secondary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
