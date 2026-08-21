@@ -14,7 +14,10 @@
         <div class="modal-card">
             <h2>CanaimaLink</h2>
             <input type="text" id="auth-username" placeholder="Apodo">
-            <input type="password" id="auth-password" placeholder="Contraseña">
+            <div class="input-eye-container">
+                <input type="password" id="auth-password" placeholder="Contraseña">
+                <button type="button" id="btn-toggle-login-pass" class="icon-btn">👁️</button>
+            </div>
             <button id="btn-login" class="primary-btn">Ingresar / Crear cuenta</button>
             <p id="auth-error" class="error-msg"></p>
         </div>
@@ -76,7 +79,9 @@
                 <div class="emoji-picker-wrapper">
                     <button id="btn-emoji" class="icon-btn">😊</button>
                     <div id="emoji-dropdown" class="emoji-dropdown hidden">
-                        <span>😀</span><span>😂</span><span>😍</span><span>👍</span><span>🔥</span><span>🎉</span><span>❤️</span><span>🚀</span>
+                        <span>😀</span><span>😂</span><span>😍</span><span>👍</span><span>🔥</span><span>🎉</span>
+                        <span>❤️</span><span>🚀</span><span>😎</span><span>🙌</span><span>💩</span><span>💀</span>
+                        <span>🙈</span><span>🎮</span><span>⚽</span><span>🍕</span><span>⚡</span><span>✨</span>
                     </div>
                 </div>
                 <input type="text" id="message-input" placeholder="Escribe un mensaje...">
@@ -85,36 +90,64 @@
         </main>
     </div>
 
-    <!-- Modal Ajustes -->
-    <div id="settings-modal" class="modal hidden flex-center">
-        <div class="modal-card">
-            <h3>Configuración</h3>
-            <div class="theme-switch-container">
-                <button id="btn-theme-light" class="theme-btn">Claro ☀️</button>
-                <button id="btn-theme-dark" class="theme-btn">Oscuro 🌙</button>
+    <!-- Modal Ajustes Pantalla Completa -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="full-screen-modal">
+            <div class="modal-header-nav">
+                <button id="btn-close-settings" class="icon-btn">⬅️ Volver</button>
+                <h2>Configuración de Perfil</h2>
             </div>
 
-            <label>Avatar:</label>
-            <div class="avatar-selector">
-                <span class="avatar-option">🤖</span>
-                <span class="avatar-option">🦊</span>
-                <span class="avatar-option">🐱</span>
-                <span class="avatar-option">🚀</span>
-                <span class="avatar-option">🎓</span>
+            <div class="form-group">
+                <label><strong>Tema de la App:</strong></label>
+                <div class="theme-switch-container">
+                    <button id="btn-theme-light" class="theme-btn">Claro ☀️</button>
+                    <button id="btn-theme-dark" class="theme-btn">Oscuro 🌙</button>
+                </div>
             </div>
 
-            <label>Tipo de Letra:</label>
-            <select id="font-selector">
-                <option value="sans">Sans-serif</option>
-                <option value="serif">Serif</option>
-                <option value="monospace">Monospace</option>
-            </select>
+            <div class="form-group">
+                <label><strong>Nuevo Apodo / Nombre de Usuario:</strong></label>
+                <input type="text" id="settings-username" placeholder="Tu nuevo apodo">
+            </div>
 
-            <input type="password" id="settings-password" placeholder="Nueva contraseña (opcional)">
+            <div class="form-group">
+                <label><strong>Avatar:</strong></label>
+                <div class="avatar-selector">
+                    <span class="avatar-option">🤖</span>
+                    <span class="avatar-option">🦊</span>
+                    <span class="avatar-option">🐱</span>
+                    <span class="avatar-option">🚀</span>
+                    <span class="avatar-option">🎓</span>
+                    <span class="avatar-option">👑</span>
+                    <span class="avatar-option">👾</span>
+                    <span class="avatar-option">🦁</span>
+                    <span class="avatar-option">🐉</span>
+                    <span class="avatar-option">🍕</span>
+                    <span class="avatar-option">⚽</span>
+                    <span class="avatar-option">🎧</span>
+                </div>
+            </div>
 
-            <div class="modal-actions">
-                <button id="btn-save-settings" class="action-btn">Guardar</button>
-                <button id="btn-close-settings" class="action-btn secondary">Cerrar</button>
+            <div class="form-group">
+                <label><strong>Tipo de Letra:</strong></label>
+                <select id="font-selector">
+                    <option value="sans">Sans-serif</option>
+                    <option value="serif">Serif</option>
+                    <option value="monospace">Monospace</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Contraseña Actual / Nueva:</strong></label>
+                <div class="input-eye-container">
+                    <input type="password" id="settings-password" placeholder="Escribe tu contraseña">
+                    <button type="button" id="btn-toggle-settings-pass" class="icon-btn">👁️</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button id="btn-save-settings" class="primary-btn" style="max-width: 200px;">Guardar Cambios</button>
             </div>
         </div>
     </div>

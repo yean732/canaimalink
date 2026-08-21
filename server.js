@@ -8,13 +8,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Conexión a la base de datos
 const db = new sqlite3.Database('./database.db', (err) => {
     if (err) console.error("Error BD:", err.message);
     else console.log("Base de datos SQLite activa.");
 });
 
-// Tablas
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +59,6 @@ const activeSockets = new Map();
 
 io.on('connection', (socket) => {
 
-    // Registro e Inicio de sesión
     socket.on('auth:login', ({ username, password }) => {
         db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
             if (err) return socket.emit('auth:response', { success: false, message: 'Error en servidor' });
@@ -105,13 +102,12 @@ io.on('connection', (socket) => {
         });
     }
 
-    // Perfil y Configuración
-    socket.on('user:update_settings', ({ avatar, font, password }) => {
+    socket.on('user:update_settings', ({ username, avatar, font, password }) => {
         const currentUser = activeSockets.get(socket.id);
         if (!currentUser) return;
 
-        let query = `UPDATE users SET avatar = ?, font_family = ?`;
-        let params = [avatar, font];
+        let query = `UPDATE users SET avatar = ?, font_family = ?, username = ?`;
+        let params = [avatar, font, username];
 
         if (password && password.trim() !== "") {
             query += `, password = ?`;
@@ -121,17 +117,18 @@ io.on('connection', (socket) => {
         query += ` WHERE id = ?`;
         params.push(currentUser.id);
 
-        db.run(query, params, (err) => {
-            if (!err) {
-                currentUser.avatar = avatar;
-                currentUser.font_family = font;
-                activeSockets.set(socket.id, currentUser);
-                socket.emit('user:settings_updated', { avatar, font });
+        db.run(query, params, function(err) {
+            if (err) {
+                return socket.emit('notification', { message: 'El apodo ya existe o no se pudo cambiar' });
             }
+            currentUser.username = username;
+            currentUser.avatar = avatar;
+            currentUser.font_family = font;
+            activeSockets.set(socket.id, currentUser);
+            socket.emit('user:settings_updated', { username, avatar, font });
         });
     });
 
-    // Añadir Contacto
     socket.on('contact:add', ({ searchName }) => {
         const currentUser = activeSockets.get(socket.id);
         if (!currentUser) return;
@@ -147,7 +144,6 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Grupos
     socket.on('group:create', ({ groupName }) => {
         const currentUser = activeSockets.get(socket.id);
         if (!currentUser) return;
@@ -185,7 +181,6 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Historial y Mensajes
     socket.on('chat:load_messages', ({ targetId, isGroup }) => {
         const currentUser = activeSockets.get(socket.id);
         if (!currentUser) return;
@@ -283,6 +278,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => activeSockets.delete(socket.id));
 });
 
-server.listen(3000, '0.0.0.0', () => {
-    console.log("CanaimaLink listo en red local");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor activo en el puerto ${PORT}`);
 });

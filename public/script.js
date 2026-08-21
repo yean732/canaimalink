@@ -6,6 +6,10 @@ let contactsList = [];
 let groupsList = [];
 let currentTab = 'chats';
 
+// Cargar tema guardado en localStorage
+const savedTheme = localStorage.getItem('canaima_theme') || 'theme-light';
+document.body.className = savedTheme;
+
 const authModal = document.getElementById('auth-modal');
 const settingsModal = document.getElementById('settings-modal');
 const listContainer = document.getElementById('list-container');
@@ -197,11 +201,22 @@ document.getElementById('btn-clear-chat').addEventListener('click', () => {
 socket.on('chat:cleared', () => messagesContainer.innerHTML = '');
 
 // Ajustes
-document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
+document.getElementById('btn-open-settings').addEventListener('click', () => {
+    document.getElementById('settings-username').value = currentUser.username;
+    settingsModal.classList.remove('hidden');
+});
+
 document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
 
-document.getElementById('btn-theme-light').addEventListener('click', () => document.body.className = 'theme-light');
-document.getElementById('btn-theme-dark').addEventListener('click', () => document.body.className = 'theme-dark');
+document.getElementById('btn-theme-light').addEventListener('click', () => {
+    document.body.className = 'theme-light';
+    localStorage.setItem('canaima_theme', 'theme-light');
+});
+
+document.getElementById('btn-theme-dark').addEventListener('click', () => {
+    document.body.className = 'theme-dark';
+    localStorage.setItem('canaima_theme', 'theme-dark');
+});
 
 document.querySelectorAll('.avatar-option').forEach(opt => {
     opt.addEventListener('click', (e) => {
@@ -215,16 +230,31 @@ document.getElementById('btn-save-settings').addEventListener('click', () => {
     const avatar = selected ? selected.innerText : currentUser.avatar;
     const font = document.getElementById('font-selector').value;
     const password = document.getElementById('settings-password').value;
+    const username = document.getElementById('settings-username').value.trim() || currentUser.username;
 
-    socket.emit('user:update_settings', { avatar: avatar, font: font, password: password });
+    socket.emit('user:update_settings', { username: username, avatar: avatar, font: font, password: password });
 });
 
-socket.on('user:settings_updated', ({ avatar, font }) => {
+socket.on('user:settings_updated', ({ username, avatar, font }) => {
+    currentUser.username = username;
     currentUser.avatar = avatar;
     currentUser.font_family = font;
+    document.getElementById('current-user-name').innerText = username;
     document.getElementById('current-user-avatar').innerText = avatar;
     settingsModal.classList.add('hidden');
+    alert("¡Perfil actualizado con éxito!");
 });
+
+// Ver/Ocultar contraseña
+function setupEyeToggle(btnId, inputId) {
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    btn.addEventListener('click', () => {
+        input.type = input.type === 'password' ? 'text' : 'password';
+    });
+}
+setupEyeToggle('btn-toggle-login-pass', 'auth-password');
+setupEyeToggle('btn-toggle-settings-pass', 'settings-password');
 
 // Emojis
 document.getElementById('btn-emoji').addEventListener('click', () => {
