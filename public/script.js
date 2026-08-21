@@ -1,25 +1,8 @@
 const socket = io();
 
-// Registro de PWA (App Instalable)
-let deferredPrompt;
+// PWA
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW error:', err));
-}
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const btnPwa = document.getElementById('btn-install-pwa');
-    if (btnPwa) btnPwa.classList.remove('hidden');
-});
-
-const btnInstall = document.getElementById('btn-install-pwa');
-if (btnInstall) {
-    btnInstall.addEventListener('click', () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            deferredPrompt = null;
-        }
-    });
+    navigator.serviceWorker.register('/sw.js').catch(e => console.log(e));
 }
 
 let currentUser = null;
@@ -27,10 +10,13 @@ let activeTarget = null;
 let contactsList = [];
 let groupsList = [];
 let currentTab = 'chats';
-let typingTimeout = null;
+let selectedAvatar = '🤖';
+let selectedColor = '#3a86ff';
 
-// Cargar tema guardado
+// Cargar preferencias guardadas
 document.body.className = localStorage.getItem('canaima_theme') || 'theme-light';
+document.documentElement.style.setProperty('--chat-font-size', localStorage.getItem('canaima_font_size') || '0.95rem');
+document.documentElement.style.setProperty('--msg-gap', localStorage.getItem('canaima_msg_gap') || '10px');
 
 // Autologin por Token
 const savedToken = localStorage.getItem('canaima_token');
@@ -46,7 +32,24 @@ const messageInput = document.getElementById('message-input');
 const chatHeader = document.getElementById('chat-header');
 const chatFooter = document.getElementById('chat-footer');
 
-// Login
+// Pestañas y animación de la barra azul
+const tabChats = document.getElementById('tab-chats');
+const tabGroups = document.getElementById('tab-groups');
+const tabIndicator = document.getElementById('tab-indicator');
+
+tabChats.addEventListener('click', () => {
+    currentTab = 'chats';
+    tabIndicator.style.transform = 'translateX(0%)';
+    renderList();
+});
+
+tabGroups.addEventListener('click', () => {
+    currentTab = 'groups';
+    tabIndicator.style.transform = 'translateX(100%)';
+    renderList();
+});
+
+// Autenticación
 document.getElementById('btn-login').addEventListener('click', () => {
     const username = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value.trim();
@@ -56,21 +59,21 @@ document.getElementById('btn-login').addEventListener('click', () => {
 socket.on('auth:response', (res) => {
     if (res.success) {
         currentUser = res.user;
+        selectedAvatar = currentUser.avatar || '🤖';
+        selectedColor = currentUser.bubble_color || '#3a86ff';
         if (currentUser.token) localStorage.setItem('canaima_token', currentUser.token);
+        
         authModal.classList.add('hidden');
         document.getElementById('current-user-name').innerText = currentUser.username;
-        document.getElementById('current-user-avatar').innerText = currentUser.avatar || '🤖';
+        document.getElementById('current-user-avatar').innerText = selectedAvatar;
     } else {
-        document.getElementById('auth-error').innerText = res.message || 'Error al iniciar sesión';
+        document.getElementById('auth-error').innerText = res.message || 'Error de sesión';
     }
 });
 
 // Cargar listas
 socket.on('data:contacts', (d) => { contactsList = d; if (currentTab === 'chats') renderList(); });
 socket.on('data:groups', (d) => { groupsList = d; if (currentTab === 'groups') renderList(); });
-
-document.getElementById('tab-chats').addEventListener('click', () => { currentTab = 'chats'; renderList(); });
-document.getElementById('tab-groups').addEventListener('click', () => { currentTab = 'groups'; renderList(); });
 
 function renderList() {
     listContainer.innerHTML = '';
@@ -92,8 +95,6 @@ function selectChat(item) {
     chatHeader.classList.remove('hidden');
     chatFooter.classList.remove('hidden');
 
-    messageInput.value = localStorage.getItem('draft_' + activeTarget.id) || '';
-
     document.getElementById('app-sidebar').classList.add('mobile-hidden');
     document.getElementById('app-chat-area').classList.remove('mobile-hidden');
 
@@ -105,23 +106,7 @@ document.getElementById('btn-back-chat').addEventListener('click', () => {
     document.getElementById('app-chat-area').classList.add('mobile-hidden');
 });
 
-// Indicador Escribiendo
-messageInput.addEventListener('input', (e) => {
-    if (activeTarget) {
-        localStorage.setItem('draft_' + activeTarget.id, e.target.value);
-        socket.emit('typing', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, isTyping: true });
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-            socket.emit('typing', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, isTyping: false });
-        }, 1500);
-    }
-});
-
-socket.on('user:typing', ({ username, isTyping }) => {
-    document.getElementById('typing-indicator').innerText = isTyping ? username + ' está escribiendo...' : '';
-});
-
-// Enviar Mensaje
+// Enviar Mensajes
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
@@ -130,7 +115,6 @@ function sendMessage() {
     if (content && activeTarget) {
         socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content });
         messageInput.value = '';
-        localStorage.removeItem('draft_' + activeTarget.id);
     }
 }
 
@@ -185,7 +169,7 @@ function appendMessage(msg) {
     bubble.className = 'message-bubble ' + (isMe ? 'sent' : 'received');
     if (isMe) bubble.style.backgroundColor = msg.bubble_color || '#3a86ff';
 
-    let mediaHtml = msg.media_url ? '<img src="' + msg.media_url + '" class="media-preview-img" onclick="openLightbox(\'' + msg.media_url + '\')">' : '';
+    let mediaHtml = msg.media_url ? '<img src="' + msg.media_url + '" style="max-width:200px; border-radius:8px; display:block; margin-top:5px;">' : '';
 
     bubble.innerHTML = 
         (activeTarget && activeTarget.isGroup && !isMe ? '<div class="msg-sender">' + (msg.sender_name || 'Usuario') + '</div>' : '') +
@@ -195,15 +179,25 @@ function appendMessage(msg) {
     messagesContainer.appendChild(bubble);
 }
 
-// Galería Flotante (Lightbox)
-window.openLightbox = (url) => {
-    document.getElementById('lightbox-img').src = url;
-    document.getElementById('lightbox-download').href = url;
-    document.getElementById('lightbox-modal').classList.remove('hidden');
-};
-document.getElementById('btn-close-lightbox').addEventListener('click', () => document.getElementById('lightbox-modal').classList.add('hidden'));
+// Selección interactiva de Avatares
+document.querySelectorAll('.avatar-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+        document.querySelectorAll('.avatar-option').forEach(x => x.classList.remove('selected'));
+        e.target.classList.add('selected');
+        selectedAvatar = e.target.innerText;
+    });
+});
 
-// Modal Ajustes
+// Selección interactiva de Colores
+document.querySelectorAll('.color-circle').forEach(circle => {
+    circle.addEventListener('click', (e) => {
+        document.querySelectorAll('.color-circle').forEach(x => x.classList.remove('selected'));
+        e.target.classList.add('selected');
+        selectedColor = e.target.dataset.color;
+    });
+});
+
+// Guardado de Ajustes (Avatar, Color, Fuente y Separación)
 document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
 document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
 
@@ -215,6 +209,31 @@ document.getElementById('btn-theme-light').addEventListener('click', () => {
 document.getElementById('btn-theme-dark').addEventListener('click', () => {
     document.body.className = 'theme-dark';
     localStorage.setItem('canaima_theme', 'theme-dark');
+});
+
+document.getElementById('btn-save-settings').addEventListener('click', () => {
+    const fontSize = document.getElementById('font-size-selector').value;
+    const msgGap = document.getElementById('msg-gap-selector').value;
+    const username = document.getElementById('settings-username').value.trim() || currentUser.username;
+
+    // Aplicar tamaño de fuente y separación en pantalla
+    document.documentElement.style.setProperty('--chat-font-size', fontSize);
+    document.documentElement.style.setProperty('--msg-gap', msgGap);
+    
+    localStorage.setItem('canaima_font_size', fontSize);
+    localStorage.setItem('canaima_msg_gap', msgGap);
+
+    socket.emit('user:update_settings', { username, color: selectedColor, avatar: selectedAvatar, bgUrl: '' });
+});
+
+socket.on('user:settings_updated', (d) => {
+    currentUser.username = d.username;
+    currentUser.avatar = d.avatar;
+    currentUser.bubble_color = d.color;
+    
+    document.getElementById('current-user-name').innerText = d.username;
+    document.getElementById('current-user-avatar').innerText = d.avatar;
+    settingsModal.classList.add('hidden');
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => {
@@ -234,5 +253,3 @@ document.getElementById('btn-create-group').addEventListener('click', () => {
     if (name) socket.emit('group:create', { groupName: name });
 });
 socket.on('group:created', (g) => { groupsList.push(g); renderList(); });
-
-socket.on('notification', (data) => alert(data.message));
