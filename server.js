@@ -3,13 +3,11 @@ const http = require('http');
 const { Server } = require('socket.io');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e7 }); // 20MB para fotos/audios
 
-// Base de datos persistente
 const dbDir = process.env.RENDER ? '/tmp' : '.';
 const dbPath = path.join(dbDir, 'database.db');
 const db = new sqlite3.Database(dbPath);
@@ -58,11 +56,12 @@ db.serialize(() => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const activeSockets = new Map();
+// Mapa para usuarios conectados en tiempo real
+const activeSockets = new Map(); // socket.id -> userObj
+const onlineUsers = new Map();  // userId -> Set de socket.ids
 
 io.on('connection', (socket) => {
 
-    // Login y Autologin mediante Token
     socket.on('auth:login', ({ username, password, token }) => {
         if (token) {
             db.get(`SELECT * FROM users WHERE token = ?`, [token], (err, user) => {
@@ -88,8 +87,18 @@ io.on('connection', (socket) => {
 
     function loginSuccess(socket, user) {
         activeSockets.set(socket.id, user);
+        
+        if (!onlineUsers.has(user.id)) onlineUsers.set(user.id, new Set());
+        onlineUsers.get(user.id).add(socket.id);
+
         socket.emit('auth:response', { success: true, user });
+        broadcastOnlineState();
         loadUserData(socket, user.id);
+    }
+
+    function broadcastOnlineState() {
+        const activeIds = Array.from(onlineUsers.keys());
+        io.emit('user:online_list', activeIds);
     }
 
     function loadUserData(socket, userId) {
@@ -105,7 +114,36 @@ io.on('connection', (socket) => {
         });
     }
 
-    // Mensajes y Audios
+    // Indicador de Escribiendo...
+    socket.on('typing:start', ({ targetId, isGroup }) => {
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+
+        if (isGroup) {
+            socket.to(`group_${targetId}`).emit('typing:show', { senderId: u.id, senderName: u.username, targetId, isGroup: true });
+        } else {
+            const sockets = onlineUsers.get(parseInt(targetId));
+            if (sockets) {
+                sockets.forEach(sId => io.to(sId).emit('typing:show', { senderId: u.id, senderName: u.username, targetId: u.id, isGroup: false }));
+            }
+        }
+    });
+
+    socket.on('typing:stop', ({ targetId, isGroup }) => {
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+
+        if (isGroup) {
+            socket.to(`group_${targetId}`).emit('typing:hide', { senderId: u.id, targetId, isGroup: true });
+        } else {
+            const sockets = onlineUsers.get(parseInt(targetId));
+            if (sockets) {
+                sockets.forEach(sId => io.to(sId).emit('typing:hide', { senderId: u.id, targetId: u.id, isGroup: false }));
+            }
+        }
+    });
+
+    // Envío de Mensajes
     socket.on('message:send', ({ targetId, isGroup, content, mediaUrl, pollData }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -127,17 +165,14 @@ io.on('connection', (socket) => {
                 io.to(`group_${gId}`).emit('message:received', msgData);
             } else {
                 socket.emit('message:received', msgData);
-                for (let [sId, usr] of activeSockets.entries()) {
-                    if (usr.id === parseInt(targetId)) {
-                        io.to(sId).emit('message:received', msgData);
-                        break;
-                    }
+                const targetSockets = onlineUsers.get(parseInt(targetId));
+                if (targetSockets) {
+                    targetSockets.forEach(sId => io.to(sId).emit('message:received', msgData));
                 }
             }
         });
     });
 
-    // Cargar Historial
     socket.on('chat:load_messages', ({ targetId, isGroup }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -156,21 +191,18 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Editar Mensaje
     socket.on('message:edit', ({ messageId, newContent }) => {
         db.run(`UPDATE messages SET content = ?, is_edited = 1 WHERE id = ?`, [newContent, messageId], () => {
             io.emit('message:edited', { messageId, newContent });
         });
     });
 
-    // Borrar Mensaje
     socket.on('message:delete', ({ messageId }) => {
         db.run(`UPDATE messages SET is_deleted = 1, content = 'Mensaje eliminado' WHERE id = ?`, [messageId], () => {
             io.emit('message:deleted', { messageId });
         });
     });
 
-    // Votar en Encuestas
     socket.on('poll:vote', ({ messageId, optionIdx }) => {
         db.get(`SELECT poll_data FROM messages WHERE id = ?`, [messageId], (e, row) => {
             if (!row || !row.poll_data) return;
@@ -183,7 +215,6 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Actualizar Ajustes
     socket.on('user:update_settings', (data) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -192,10 +223,10 @@ io.on('connection', (socket) => {
             [data.username, data.avatar, data.color, u.id], () => {
             Object.assign(u, data);
             socket.emit('user:settings_updated', data);
+            io.emit('user:profile_changed', { userId: u.id, username: data.username, avatar: data.avatar });
         });
     });
 
-    // Contactos y Grupos
     socket.on('contact:add', ({ searchName }) => {
         const u = activeSockets.get(socket.id);
         db.get(`SELECT id, username, avatar, bubble_color FROM users WHERE username = ?`, [searchName], (e, target) => {
@@ -219,7 +250,16 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('disconnect', () => activeSockets.delete(socket.id));
+    socket.on('disconnect', () => {
+        const u = activeSockets.get(socket.id);
+        if (u && onlineUsers.has(u.id)) {
+            const userSockets = onlineUsers.get(u.id);
+            userSockets.delete(socket.id);
+            if (userSockets.size === 0) onlineUsers.delete(u.id);
+        }
+        activeSockets.delete(socket.id);
+        broadcastOnlineState();
+    });
 });
 
 const PORT = process.env.PORT || 3000;

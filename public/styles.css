@@ -4,7 +4,7 @@
     --bg-app: #f0f4f8; --sidebar-bg: #ffffff; --header-bg: #3a86ff;
     --header-text: #ffffff; --chat-bg: #eef2f5; --text-primary: #1e293b;
     --border-color: #e2e8f0; --input-bg: #f8fafc; --bubble-my-color: #3a86ff;
-    --chat-font-size: 0.95rem; --msg-gap: 10px;
+    --chat-font-size: 0.95rem; --msg-gap: 10px; --custom-chat-bg: none;
 }
 
 .theme-dark {
@@ -16,10 +16,15 @@
 body { background: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; overflow: hidden; }
 .app-container { width: 100vw; height: 100vh; display: flex; position: relative; }
 
-/* PC Design */
+/* Sidebar */
 .sidebar { width: 340px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; background: var(--sidebar-bg); z-index: 10; position: relative; }
 .sidebar-header { height: 60px; background: var(--header-bg); color: var(--header-text); padding: 0 15px; display: flex; align-items: center; justify-content: space-between; }
-.avatar-box { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2); font-size: 1.2rem; }
+
+/* Avatar y Puntito Verde */
+.avatar-wrapper { position: relative; display: inline-block; width: 40px; height: 40px; }
+.avatar-box { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.2); font-size: 1.2rem; overflow: hidden; border: 1px solid var(--border-color); }
+.avatar-box img { width: 100%; height: 100%; object-fit: cover; }
+.online-dot { width: 12px; height: 12px; background-color: #22c55e; border: 2px solid var(--sidebar-bg); border-radius: 50%; position: absolute; bottom: 0; right: 0; }
 
 .search-bar-container { padding: 8px; }
 .search-bar-container input { width: 100%; padding: 8px 12px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit; }
@@ -28,28 +33,36 @@ body { background: var(--bg-app); color: var(--text-primary); height: 100vh; dis
 .action-btn, .primary-btn { flex: 1; padding: 8px; border: none; background: #3a86ff; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; }
 
 .list-container { flex: 1; overflow-y: auto; padding-bottom: 60px; }
-.list-item { display: flex; align-items: center; padding: 12px; gap: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+.list-item { display: flex; align-items: center; padding: 12px; gap: 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
 
 /* Navegación Abajo (Chats / Grupos) */
 .nav-tabs-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 55px; background: var(--sidebar-bg); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: center; }
 .tab-btn { flex: 1; height: 100%; border: none; background: none; color: inherit; cursor: pointer; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.85rem; }
 .tab-btn.active { color: #3a86ff; border-top: 3px solid #3a86ff; }
 
-/* Área de Chat */
-.chat-area { flex: 1; display: flex; flex-direction: column; background: var(--chat-bg); position: relative; }
+/* Área de Chat y Fondo Personalizable */
+.chat-area { flex: 1; display: flex; flex-direction: column; background: var(--chat-bg); background-image: var(--custom-chat-bg); background-size: cover; background-position: center; position: relative; }
 .chat-header { height: 60px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 15px; }
 .chat-title-info { display: flex; align-items: center; gap: 10px; }
+
+/* Animación Escribiendo... */
+.typing-dots { display: inline-flex; align-items: center; gap: 3px; margin-left: 5px; }
+.typing-dots span { width: 4px; height: 4px; background-color: #22c55e; border-radius: 50%; animation: blink 1.4s infinite iterative; }
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
 
 .messages-container { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: var(--msg-gap); font-size: var(--chat-font-size); }
 .placeholder-chat { margin: auto; text-align: center; opacity: 0.7; }
 
-/* Mensajes con opciones */
+/* Mensajes */
 .message-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; position: relative; word-wrap: break-word; display: flex; flex-direction: column; gap: 4px; }
 .message-bubble.sent { align-self: flex-end; color: white; border-bottom-right-radius: 2px; }
 .message-bubble.received { align-self: flex-start; background: var(--sidebar-bg); border-bottom-left-radius: 2px; }
 
 .msg-header-info { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.msg-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; }
+.msg-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.msg-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .msg-sender { font-size: 0.75rem; font-weight: bold; color: #3a86ff; }
 
 .msg-text.deleted { font-style: italic; opacity: 0.7; }
@@ -79,8 +92,8 @@ audio { max-width: 220px; height: 35px; }
 .full-screen-modal { width: 100vw; height: 100vh; background: var(--sidebar-bg); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; max-width: 500px; }
 
-.color-options { display: flex; gap: 10px; margin-top: 5px; }
-.color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; }
+.color-options { display: flex; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
+.color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; background-size: cover; }
 .color-circle.selected { border-color: #ffffff; box-shadow: 0 0 6px #000; }
 
 .avatar-selector { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; font-size: 1.5rem; max-width: 500px; }

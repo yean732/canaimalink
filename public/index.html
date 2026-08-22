@@ -25,8 +25,11 @@
         <!-- Sidebar -->
         <aside id="app-sidebar" class="sidebar">
             <header class="sidebar-header">
-                <div class="user-profile-summary" style="display: flex; align-items: center; gap: 8px;">
-                    <div id="current-user-avatar" class="avatar-box">🤖</div>
+                <div class="user-profile-summary" style="display: flex; align-items: center; gap: 10px;">
+                    <div class="avatar-wrapper">
+                        <div id="current-user-avatar" class="avatar-box">🤖</div>
+                        <div class="online-dot"></div>
+                    </div>
                     <span id="current-user-name" style="font-weight: bold;">Cargando...</span>
                 </div>
                 <button id="btn-open-settings" class="icon-btn">⚙️</button>
@@ -61,10 +64,13 @@
             <header id="chat-header" class="chat-header hidden">
                 <div class="chat-title-info">
                     <button id="btn-back-chat" class="icon-btn btn-back-mobile">⬅️</button>
-                    <div id="chat-target-avatar" class="avatar-box">👤</div>
+                    <div class="avatar-wrapper">
+                        <div id="chat-target-avatar" class="avatar-box">👤</div>
+                        <div id="chat-target-status-dot" class="online-dot hidden"></div>
+                    </div>
                     <div>
                         <h3 id="chat-target-name">Selecciona un chat</h3>
-                        <div id="typing-indicator" style="font-size:0.75rem; color:#22c55e;"></div>
+                        <div id="typing-indicator" style="font-size:0.75rem; color:#22c55e; min-height: 16px;"></div>
                     </div>
                 </div>
                 <div>
@@ -107,21 +113,9 @@
             </div>
 
             <div class="form-group">
-                <label><strong>Tamaño de Letra:</strong></label>
-                <select id="font-size-selector" class="action-btn" style="background: var(--input-bg); color: inherit;">
-                    <option value="0.8rem">Pequeño</option>
-                    <option value="0.95rem" selected>Mediano</option>
-                    <option value="1.15rem">Grande</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label><strong>Separación de Mensajes:</strong></label>
-                <select id="msg-gap-selector" class="action-btn" style="background: var(--input-bg); color: inherit;">
-                    <option value="4px">Pequeño</option>
-                    <option value="10px" selected>Mediano</option>
-                    <option value="18px">Grande</option>
-                </select>
+                <label><strong>Fondo de Pantalla del Chat:</strong></label>
+                <input type="file" id="bg-file-input" accept="image/*" style="margin-bottom: 5px;">
+                <button id="btn-reset-bg" class="action-btn" style="background:#64748b; max-width: 180px;">Restablecer Fondo</button>
             </div>
 
             <div class="form-group">
@@ -137,13 +131,13 @@
             </div>
 
             <div class="form-group">
-                <label><strong>Avatar o Foto de Perfil:</strong></label>
+                <label><strong>Foto de Perfil Personalizada:</strong></label>
                 <input type="file" id="profile-img-input" accept="image/*" style="margin-bottom: 5px;">
+                <label style="font-size:0.8rem; opacity:0.8;">O elige un avatar:</label>
                 <div class="avatar-selector">
                     <span class="avatar-option selected">🤖</span><span class="avatar-option">🦊</span>
                     <span class="avatar-option">🐱</span><span class="avatar-option">🚀</span>
                     <span class="avatar-option">🎓</span><span class="avatar-option">👑</span>
-                    <span class="avatar-option">👾</span><span class="avatar-option">🦁</span>
                 </div>
             </div>
 

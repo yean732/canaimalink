@@ -1,29 +1,52 @@
 const socket = io();
 
-// Sonidos para mensajes
-const chatSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
-const groupSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+// Generador Sintético de Notificaciones de Audio (Web Audio API)
+function playTone(freq, duration) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+        osc.stop(ctx.currentTime + duration);
+    } catch(e) {}
+}
 
-// PWA Support
+function playChatSound() { playTone(800, 0.15); }
+function playGroupSound() { playTone(500, 0.25); }
+
+// Desbloquear audio en navegadores y Canaima al hacer clic
+document.addEventListener('click', () => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+}, { once: true });
+
+// PWA
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
 let currentUser = null;
 let activeTarget = null;
 let contactsList = [];
 let groupsList = [];
+let onlineUserIds = new Set();
 let currentTab = 'chats';
 let selectedAvatar = '🤖';
 let selectedColor = '#3a86ff';
+let typingTimeout = null;
 
-// Grabador de voz
+// Grabación Audio Multiplataforma
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
-// Cargar UI guardada
+// Cargar UI Guardada
 document.body.className = localStorage.getItem('canaima_theme') || 'theme-light';
-document.documentElement.style.setProperty('--chat-font-size', localStorage.getItem('canaima_font_size') || '0.95rem');
-document.documentElement.style.setProperty('--msg-gap', localStorage.getItem('canaima_msg_gap') || '10px');
+const savedBg = localStorage.getItem('canaima_custom_bg');
+if (savedBg) document.documentElement.style.setProperty('--custom-chat-bg', `url('${savedBg}')`);
 
 // Autologin por Token
 const savedToken = localStorage.getItem('canaima_token');
@@ -36,7 +59,7 @@ const listContainer = document.getElementById('list-container');
 const messagesContainer = document.getElementById('messages-container');
 const messageInput = document.getElementById('message-input');
 
-// Pestañas abajo
+// Pestañas
 const tabChats = document.getElementById('tab-chats');
 const tabGroups = document.getElementById('tab-groups');
 
@@ -76,13 +99,29 @@ socket.on('auth:response', (res) => {
     }
 });
 
+// Renderizador Seguro de Fotos de Perfil
 function renderAvatarBox(container, avatarStr) {
+    container.innerHTML = '';
     if (avatarStr && avatarStr.startsWith('data:image')) {
-        container.innerHTML = '<img src="' + avatarStr + '" class="avatar-box">';
+        const img = document.createElement('img');
+        img.src = avatarStr;
+        container.appendChild(img);
     } else {
         container.innerText = avatarStr || '👤';
     }
 }
+
+// Lista de Usuarios Conectados
+socket.on('user:online_list', (ids) => {
+    onlineUserIds = new Set(ids);
+    renderList();
+    if (activeTarget && !activeTarget.isGroup) {
+        const isOnline = onlineUserIds.has(activeTarget.id);
+        const dot = document.getElementById('chat-target-status-dot');
+        if (isOnline) dot.classList.remove('hidden');
+        else dot.classList.add('hidden');
+    }
+});
 
 // Listas
 socket.on('data:contacts', (d) => { contactsList = d; if (currentTab === 'chats') renderList(); });
@@ -94,9 +133,27 @@ function renderList() {
     items.forEach(item => {
         const div = document.createElement('div');
         div.className = 'list-item';
-        let av = item.avatar || '👤';
-        let avHtml = av.startsWith('data:image') ? '<img src="' + av + '" class="avatar-box">' : '<span class="avatar-box">' + av + '</span>';
-        div.innerHTML = avHtml + '<strong>' + (item.username || item.name) + '</strong>';
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'avatar-wrapper';
+        
+        const avBox = document.createElement('div');
+        avBox.className = 'avatar-box';
+        renderAvatarBox(avBox, item.avatar || (currentTab === 'groups' ? '👥' : '👤'));
+        
+        wrapper.appendChild(avBox);
+        if (currentTab === 'chats' && onlineUserIds.has(item.id)) {
+            const dot = document.createElement('div');
+            dot.className = 'online-dot';
+            wrapper.appendChild(dot);
+        }
+
+        const nameSpan = document.createElement('span');
+        nameSpan.style.fontWeight = 'bold';
+        nameSpan.innerText = item.username || item.name;
+
+        div.appendChild(wrapper);
+        div.appendChild(nameSpan);
         div.addEventListener('click', () => selectChat(item));
         listContainer.appendChild(div);
     });
@@ -105,12 +162,17 @@ function renderList() {
 function selectChat(item) {
     activeTarget = { id: item.id, name: item.username || item.name, isGroup: currentTab === 'groups' };
 
-    renderAvatarBox(document.getElementById('chat-target-avatar'), item.avatar || '👥');
+    renderAvatarBox(document.getElementById('chat-target-avatar'), item.avatar || (activeTarget.isGroup ? '👥' : '👤'));
     document.getElementById('chat-target-name').innerText = activeTarget.name;
+    
+    const dot = document.getElementById('chat-target-status-dot');
+    if (!activeTarget.isGroup && onlineUserIds.has(activeTarget.id)) dot.classList.remove('hidden');
+    else dot.classList.add('hidden');
+
     document.getElementById('chat-header').classList.remove('hidden');
     document.getElementById('chat-footer').classList.remove('hidden');
 
-    // WhatsApp Navigation en Celulares
+    // Navegación Celulares
     document.getElementById('app-sidebar').classList.add('mobile-hidden');
     document.getElementById('app-chat-area').classList.remove('mobile-hidden');
 
@@ -122,6 +184,30 @@ document.getElementById('btn-back-chat').addEventListener('click', () => {
     document.getElementById('app-chat-area').classList.add('mobile-hidden');
 });
 
+// Eventos de "Escribiendo..."
+messageInput.addEventListener('input', () => {
+    if (!activeTarget) return;
+    socket.emit('typing:start', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
+    
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        socket.emit('typing:stop', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
+    }, 2000);
+});
+
+socket.on('typing:show', ({ senderId, senderName, targetId, isGroup }) => {
+    if (activeTarget && ((isGroup && activeTarget.isGroup && activeTarget.id === targetId) || (!isGroup && !activeTarget.isGroup && activeTarget.id === senderId))) {
+        const label = isGroup ? `${senderName} está escribiendo` : 'Escribiendo';
+        document.getElementById('typing-indicator').innerHTML = `${label} <span class="typing-dots"><span></span><span></span><span></span></span>`;
+    }
+});
+
+socket.on('typing:hide', ({ senderId, targetId, isGroup }) => {
+    if (activeTarget && ((isGroup && activeTarget.isGroup && activeTarget.id === targetId) || (!isGroup && !activeTarget.isGroup && activeTarget.id === senderId))) {
+        document.getElementById('typing-indicator').innerHTML = '';
+    }
+});
+
 // Enviar Mensaje
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
@@ -131,26 +217,38 @@ function sendMessage() {
     if (content && activeTarget) {
         socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content });
         messageInput.value = '';
+        socket.emit('typing:stop', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
     }
 }
 
-// Grabación de Audios
+// Audio Multiplataforma
+function getSupportedMimeType() {
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4', 'audio/aac'];
+    for (let type of types) {
+        if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+}
+
 const btnRecord = document.getElementById('btn-record-audio');
 btnRecord.addEventListener('click', async () => {
     if (!isRecording) {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+            const mimeType = getSupportedMimeType();
+            mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
             audioChunks = [];
             
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
             mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const finalMime = mediaRecorder.mimeType || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: finalMime });
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content: '🎤 Mensaje de voz', mediaUrl: evt.target.result });
                 };
                 reader.readAsDataURL(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
             };
 
             mediaRecorder.start();
@@ -164,7 +262,7 @@ btnRecord.addEventListener('click', async () => {
     }
 });
 
-// Enviar Imagen
+// Adjuntar Imagen
 document.getElementById('btn-attach').addEventListener('click', () => document.getElementById('file-input').click());
 document.getElementById('file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -177,7 +275,7 @@ document.getElementById('file-input').addEventListener('change', (e) => {
     }
 });
 
-// Historial y Recepción de Mensajes con Sonido
+// Mensajes y Notificaciones
 socket.on('chat:history', ({ messages }) => {
     messagesContainer.innerHTML = '';
     messages.forEach(appendMessage);
@@ -190,10 +288,9 @@ socket.on('message:received', (msg) => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    // Sonidos diferenciados
     if (currentUser && msg.sender_id !== currentUser.id) {
-        if (msg.group_id) groupSound.play().catch(()=>{});
-        else chatSound.play().catch(()=>{});
+        if (msg.group_id) playGroupSound();
+        else playChatSound();
     }
 });
 
@@ -204,7 +301,6 @@ function appendMessage(msg) {
     bubble.className = 'message-bubble ' + (isMe ? 'sent' : 'received');
     bubble.id = 'msg-bubble-' + msg.id;
 
-    // Color de burbuja asignado por el emisor (visible para todos)
     if (isMe) bubble.style.backgroundColor = currentUser.bubble_color || '#3a86ff';
     else if (msg.bubble_color) bubble.style.backgroundColor = msg.bubble_color;
 
@@ -217,7 +313,6 @@ function appendMessage(msg) {
         }
     }
 
-    // Encuesta UI
     let pollHtml = '';
     if (msg.poll_data) {
         const p = JSON.parse(msg.poll_data);
@@ -229,15 +324,13 @@ function appendMessage(msg) {
         pollHtml += '</div>';
     }
 
-    // Header para grupos (Avatar + Nombre)
     let headerHtml = '';
     if (activeTarget && activeTarget.isGroup && !isMe) {
         let av = msg.sender_avatar || '👤';
-        let avTag = av.startsWith('data:image') ? '<img src="' + av + '" class="msg-avatar">' : '<span class="msg-avatar">' + av + '</span>';
+        let avTag = av.startsWith('data:image') ? `<span class="msg-avatar"><img src="${av}"></span>` : `<span class="msg-avatar">${av}</span>`;
         headerHtml = '<div class="msg-header-info">' + avTag + '<span class="msg-sender">' + msg.sender_name + '</span></div>';
     }
 
-    // Acciones de Borrar y Editar (Solo mensajes propios)
     let actionsHtml = isMe && !msg.is_deleted ? 
         '<div class="msg-actions"><button onclick="editMsg(' + msg.id + ')">✏️</button><button onclick="deleteMsg(' + msg.id + ')">🗑️</button></div>' : '';
 
@@ -252,7 +345,7 @@ function appendMessage(msg) {
     messagesContainer.appendChild(bubble);
 }
 
-// Editar y Borrar
+// Editar/Borrar
 window.editMsg = (id) => {
     const newText = prompt("Editar mensaje:");
     if (newText) socket.emit('message:edit', { messageId: id, newContent: newText });
@@ -297,7 +390,7 @@ socket.on('poll:updated', ({ messageId, pollData }) => {
     if (activeTarget) socket.emit('chat:load_messages', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
 });
 
-// Foto de Perfil personalizada
+// Fotos de Perfil Personalizadas y Selección
 document.getElementById('profile-img-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -323,7 +416,26 @@ document.querySelectorAll('.color-circle').forEach(circle => {
     });
 });
 
-// Guardar Ajustes
+// Fondo Personalizable del Chat
+document.getElementById('bg-file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const bgUrl = evt.target.result;
+            document.documentElement.style.setProperty('--custom-chat-bg', `url('${bgUrl}')`);
+            localStorage.setItem('canaima_custom_bg', bgUrl);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+document.getElementById('btn-reset-bg').addEventListener('click', () => {
+    document.documentElement.style.setProperty('--custom-chat-bg', 'none');
+    localStorage.removeItem('canaima_custom_bg');
+});
+
+// Ajustes
 document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
 document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
 
@@ -338,16 +450,7 @@ document.getElementById('btn-theme-dark').addEventListener('click', () => {
 });
 
 document.getElementById('btn-save-settings').addEventListener('click', () => {
-    const fontSize = document.getElementById('font-size-selector').value;
-    const msgGap = document.getElementById('msg-gap-selector').value;
     const username = document.getElementById('settings-username').value.trim() || currentUser.username;
-
-    document.documentElement.style.setProperty('--chat-font-size', fontSize);
-    document.documentElement.style.setProperty('--msg-gap', msgGap);
-    
-    localStorage.setItem('canaima_font_size', fontSize);
-    localStorage.setItem('canaima_msg_gap', msgGap);
-
     socket.emit('user:update_settings', { username, color: selectedColor, avatar: selectedAvatar });
 });
 
