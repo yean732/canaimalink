@@ -23,9 +23,6 @@ db.serialize(() => {
         token TEXT
     )`);
 
-    // Intentar agregar la columna bubble_shape si la tabla ya existía
-    db.run(`ALTER TABLE users ADD COLUMN bubble_shape TEXT DEFAULT 'shape-normal'`, () => {});
-
     db.run(`CREATE TABLE IF NOT EXISTS contacts (
         user_id INTEGER,
         contact_id INTEGER,
@@ -39,6 +36,13 @@ db.serialize(() => {
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS group_members (
+        group_id INTEGER,
+        user_id INTEGER,
+        is_admin INTEGER DEFAULT 0,
+        PRIMARY KEY (group_id, user_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS group_requests (
         group_id INTEGER,
         user_id INTEGER,
         PRIMARY KEY (group_id, user_id)
@@ -185,7 +189,107 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Control de Encuesta Estricto (1 Voto Único)
+    // SISTEMA AVANZADO DE GRUPOS
+    socket.on('group:create', ({ groupName }) => {
+        const u = activeSockets.get(socket.id);
+        db.run(`INSERT INTO groups (name, admin_id) VALUES (?, ?)`, [groupName, u.id], function() {
+            const gId = this.lastID;
+            db.run(`INSERT INTO group_members (group_id, user_id, is_admin) VALUES (?, ?, 1)`, [gId, u.id], () => {
+                socket.join(`group_${gId}`);
+                socket.emit('group:created', { id: gId, name: groupName, admin_id: u.id });
+            });
+        });
+    });
+
+    socket.on('group:search', ({ searchName }) => {
+        const u = activeSockets.get(socket.id);
+        db.all(`SELECT id, name, admin_id FROM groups WHERE name LIKE ?`, [`%${searchName}%`], (e, groups) => {
+            socket.emit('group:search_results', groups || []);
+        });
+    });
+
+    socket.on('group:request_join', ({ groupId }) => {
+        const u = activeSockets.get(socket.id);
+        db.run(`INSERT OR IGNORE INTO group_requests (group_id, user_id) VALUES (?, ?)`, [groupId, u.id], () => {
+            socket.emit('group:request_sent');
+        });
+    });
+
+    socket.on('group:get_details', ({ groupId }) => {
+        const u = activeSockets.get(socket.id);
+        db.get(`SELECT g.*, gm.is_admin FROM groups g JOIN group_members gm ON g.id = gm.group_id WHERE g.id = ? AND gm.user_id = ?`, [groupId, u.id], (e, group) => {
+            if (!group) return;
+
+            db.all(`SELECT u.id, u.username, u.avatar, gm.is_admin FROM users u JOIN group_members gm ON u.id = gm.user_id WHERE gm.group_id = ?`, [groupId], (e, members) => {
+                db.all(`SELECT u.id, u.username, u.avatar FROM users u JOIN group_requests gr ON u.id = gr.user_id WHERE gr.group_id = ?`, [groupId], (e, requests) => {
+                    socket.emit('group:details_data', {
+                        group,
+                        members: members || [],
+                        requests: requests || [],
+                        isCreator: group.admin_id === u.id,
+                        isAdmin: group.is_admin === 1
+                    });
+                });
+            });
+        });
+    });
+
+    socket.on('group:accept_request', ({ groupId, userId }) => {
+        db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id, is_admin) VALUES (?, ?, 0)`, [groupId, userId], () => {
+            db.run(`DELETE FROM group_requests WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+                const targetSockets = onlineUsers.get(parseInt(userId));
+                if (targetSockets) {
+                    targetSockets.forEach(sId => {
+                        const clientSocket = io.sockets.sockets.get(sId);
+                        if (clientSocket) clientSocket.join(`group_${groupId}`);
+                    });
+                }
+                io.to(`group_${groupId}`).emit('group:member_updated');
+            });
+        });
+    });
+
+    socket.on('group:reject_request', ({ groupId, userId }) => {
+        db.run(`DELETE FROM group_requests WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+            socket.emit('group:member_updated');
+        });
+    });
+
+    socket.on('group:make_admin', ({ groupId, userId }) => {
+        db.run(`UPDATE group_members SET is_admin = 1 WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+            io.to(`group_${groupId}`).emit('group:member_updated');
+        });
+    });
+
+    socket.on('group:kick_member', ({ groupId, userId }) => {
+        db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+            io.to(`group_${groupId}`).emit('group:member_updated');
+        });
+    });
+
+    socket.on('group:leave', ({ groupId }) => {
+        const u = activeSockets.get(socket.id);
+        db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, u.id], () => {
+            socket.leave(`group_${groupId}`);
+            socket.emit('group:left', { groupId });
+            loadUserData(socket, u.id);
+        });
+    });
+
+    socket.on('group:delete', ({ groupId }) => {
+        const u = activeSockets.get(socket.id);
+        db.get(`SELECT admin_id FROM groups WHERE id = ?`, [groupId], (e, grp) => {
+            if (grp && grp.admin_id === u.id) {
+                db.run(`DELETE FROM groups WHERE id = ?`, [groupId]);
+                db.run(`DELETE FROM group_members WHERE group_id = ?`, [groupId]);
+                db.run(`DELETE FROM group_requests WHERE group_id = ?`, [groupId]);
+                db.run(`DELETE FROM messages WHERE group_id = ?`, [groupId]);
+                io.to(`group_${groupId}`).emit('group:deleted_broadcast', { groupId });
+            }
+        });
+    });
+
+    // Control de Encuesta
     socket.on('poll:vote', ({ messageId, optionIdx }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -194,20 +298,17 @@ io.on('connection', (socket) => {
             if (!row || !row.poll_data) return;
             let poll = JSON.parse(row.poll_data);
 
-            if (!poll.voters) poll.voters = {}; // userId -> optionIdx
+            if (!poll.voters) poll.voters = {};
 
             const previousVote = poll.voters[u.id];
 
-            if (previousVote === optionIdx) {
-                // Si vuelve a tocar la misma opción, retira el voto
+            if (previousVote && previousVote.optionIdx === optionIdx) {
                 delete poll.voters[u.id];
                 poll.votes[optionIdx] = Math.max(0, (poll.votes[optionIdx] || 1) - 1);
             } else {
-                // Si tenía un voto previo en otra opción, restarlo
                 if (previousVote !== undefined) {
-                    poll.votes[previousVote] = Math.max(0, (poll.votes[previousVote] || 1) - 1);
+                    poll.votes[previousVote.optionIdx] = Math.max(0, (poll.votes[previousVote.optionIdx] || 1) - 1);
                 }
-                // Asignar nuevo voto
                 poll.voters[u.id] = { optionIdx, username: u.username };
                 poll.votes[optionIdx] = (poll.votes[optionIdx] || 0) + 1;
             }
@@ -251,17 +352,6 @@ io.on('connection', (socket) => {
                     socket.emit('contact:added', target);
                 });
             }
-        });
-    });
-
-    socket.on('group:create', ({ groupName }) => {
-        const u = activeSockets.get(socket.id);
-        db.run(`INSERT INTO groups (name, admin_id) VALUES (?, ?)`, [groupName, u.id], function() {
-            const gId = this.lastID;
-            db.run(`INSERT INTO group_members (group_id, user_id) VALUES (?, ?)`, [gId, u.id], () => {
-                socket.join(`group_${gId}`);
-                socket.emit('group:created', { id: gId, name: groupName, admin_id: u.id });
-            });
         });
     });
 

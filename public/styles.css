@@ -29,8 +29,8 @@ body { background: var(--bg-app); color: var(--text-primary); height: 100vh; dis
 .search-bar-container { padding: 8px; }
 .search-bar-container input { width: 100%; padding: 8px 12px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit; }
 
-.actions-bar { display: flex; gap: 5px; padding: 8px; }
-.action-btn, .primary-btn { flex: 1; padding: 8px; border: none; background: #3a86ff; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; }
+.actions-bar { display: flex; gap: 4px; padding: 6px; flex-wrap: wrap; }
+.action-btn, .primary-btn { flex: 1; padding: 6px 8px; border: none; background: #3a86ff; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.75rem; text-align: center; }
 
 .list-container { flex: 1; overflow-y: auto; padding-bottom: 60px; }
 .list-item { display: flex; align-items: center; padding: 12px; gap: 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
@@ -108,7 +108,7 @@ audio { max-width: 220px; height: 35px; }
 /* Modales */
 .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 100; }
 .flex-center { display: flex; justify-content: center; align-items: center; }
-.modal-card { background: var(--sidebar-bg); padding: 25px; border-radius: 12px; width: 340px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; }
+.modal-card { background: var(--sidebar-bg); padding: 25px; border-radius: 12px; width: 360px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; }
 .full-screen-modal { width: 100vw; height: 100vh; background: var(--sidebar-bg); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; max-width: 500px; }
 
@@ -120,13 +120,19 @@ audio { max-width: 220px; height: 35px; }
 .avatar-option { text-align: center; padding: 6px; border-radius: 6px; cursor: pointer; }
 .avatar-option.selected { border: 2px solid #3a86ff; background: var(--input-bg); }
 
-/* Encuestas UI Mejorada */
+/* Encuestas UI */
 .poll-card { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
 .poll-option-btn { width: 100%; padding: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit; border-radius: 6px; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
 .poll-option-btn.voted { border-color: #22c55e; background: rgba(34, 197, 94, 0.15); font-weight: bold; }
 .voters-list { font-size: 0.7rem; opacity: 0.8; margin-top: 2px; padding-left: 5px; font-style: italic; }
 
-/* Celular WhatsApp Navigation */
+/* Lista de Miembros y Solicitudes en Configuración de Grupo */
+.group-member-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.group-member-info { display: flex; align-items: center; gap: 8px; }
+.role-badge { font-size: 0.65rem; background: #3a86ff; color: white; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+.role-badge.admin { background: #f59e0b; }
+
+/* Celular Navigation */
 @media (max-width: 768px) {
     .sidebar { width: 100%; height: 100%; position: absolute; left: 0; top: 0; }
     .chat-area { width: 100%; height: 100%; position: absolute; left: 0; top: 0; }

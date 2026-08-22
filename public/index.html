@@ -42,6 +42,7 @@
             <div class="actions-bar">
                 <button id="btn-add-contact" class="action-btn">+ Contacto</button>
                 <button id="btn-create-group" class="action-btn">+ Grupo</button>
+                <button id="btn-search-group" class="action-btn" style="background:#10b981;">🔍 Buscar Grupo</button>
             </div>
 
             <div id="list-container" class="list-container"></div>
@@ -73,15 +74,16 @@
                         <div id="typing-indicator" style="font-size:0.75rem; color:#22c55e; min-height: 16px;"></div>
                     </div>
                 </div>
-                <div>
+                <div style="display: flex; gap: 8px;">
                     <button id="btn-create-poll" class="icon-btn" title="Crear Encuesta">📊</button>
+                    <button id="btn-group-config" class="icon-btn hidden" title="Ajustes de Grupo">⚙️</button>
                 </div>
             </header>
 
             <div id="messages-container" class="messages-container">
                 <div class="placeholder-chat">
                     <h2>CanaimaLink Messenger</h2>
-                    <p>Selecciona un contacto para comenzar a chatear.</p>
+                    <p>Selecciona un contacto o grupo para comenzar a chatear.</p>
                 </div>
             </div>
 
@@ -105,7 +107,7 @@
         </main>
     </div>
 
-    <!-- Modal Ajustes -->
+    <!-- Modal Ajustes Generales -->
     <div id="settings-modal" class="modal hidden">
         <div class="full-screen-modal">
             <div style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
@@ -214,6 +216,31 @@
             <div style="display: flex; gap: 8px;">
                 <button id="btn-send-poll" class="primary-btn">Crear</button>
                 <button id="btn-close-poll" class="action-btn" style="background:#64748b;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configuración del Grupo -->
+    <div id="group-info-modal" class="modal hidden flex-center">
+        <div class="modal-card" style="width: 400px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="group-info-title">Opciones del Grupo</h3>
+                <button id="btn-close-group-info" class="icon-btn">❌</button>
+            </div>
+
+            <div id="admin-requests-section" class="hidden" style="border: 1px dashed #f59e0b; padding: 10px; border-radius: 8px; background: rgba(245, 158, 11, 0.1);">
+                <strong style="color: #f59e0b;">Solicitudes Pendientes:</strong>
+                <div id="group-requests-list" style="margin-top: 5px;"></div>
+            </div>
+
+            <div>
+                <strong>Miembros del Grupo:</strong>
+                <div id="group-members-list" style="margin-top: 8px; max-height: 180px; overflow-y: auto;"></div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                <button id="btn-leave-group" class="action-btn" style="background: #ef4444;">🚪 Salir del Grupo</button>
+                <button id="btn-delete-group" class="action-btn hidden" style="background: #b91c1c;">💥 Eliminar Grupo (Solo Admin)</button>
             </div>
         </div>
     </div>
