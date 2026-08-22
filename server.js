@@ -6,7 +6,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 2e7 }); // 20MB para fotos/audios
+const io = new Server(server, { maxHttpBufferSize: 3e7 }); // 30MB para adjuntos grandes
 
 const dbDir = process.env.RENDER ? '/tmp' : '.';
 const dbPath = path.join(dbDir, 'database.db');
@@ -19,8 +19,12 @@ db.serialize(() => {
         password TEXT,
         avatar TEXT,
         bubble_color TEXT DEFAULT '#3a86ff',
+        bubble_shape TEXT DEFAULT 'shape-normal',
         token TEXT
     )`);
+
+    // Intentar agregar la columna bubble_shape si la tabla ya existía
+    db.run(`ALTER TABLE users ADD COLUMN bubble_shape TEXT DEFAULT 'shape-normal'`, () => {});
 
     db.run(`CREATE TABLE IF NOT EXISTS contacts (
         user_id INTEGER,
@@ -47,6 +51,7 @@ db.serialize(() => {
         group_id INTEGER,
         content TEXT,
         media_url TEXT,
+        media_type TEXT,
         poll_data TEXT,
         is_edited INTEGER DEFAULT 0,
         is_deleted INTEGER DEFAULT 0,
@@ -56,9 +61,8 @@ db.serialize(() => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Mapa para usuarios conectados en tiempo real
-const activeSockets = new Map(); // socket.id -> userObj
-const onlineUsers = new Map();  // userId -> Set de socket.ids
+const activeSockets = new Map();
+const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
 
@@ -72,9 +76,9 @@ io.on('connection', (socket) => {
             db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
                 if (!user) {
                     const newToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
-                    db.run(`INSERT INTO users (username, password, avatar, bubble_color, token) VALUES (?, ?, '🤖', '#3a86ff', ?)`, 
+                    db.run(`INSERT INTO users (username, password, avatar, bubble_color, bubble_shape, token) VALUES (?, ?, '🤖', '#3a86ff', 'shape-normal', ?)`, 
                         [username, password, newToken], function() {
-                        loginSuccess(socket, { id: this.lastID, username, avatar: '🤖', bubble_color: '#3a86ff', token: newToken });
+                        loginSuccess(socket, { id: this.lastID, username, avatar: '🤖', bubble_color: '#3a86ff', bubble_shape: 'shape-normal', token: newToken });
                     });
                 } else if (user.password === password) {
                     loginSuccess(socket, user);
@@ -87,7 +91,6 @@ io.on('connection', (socket) => {
 
     function loginSuccess(socket, user) {
         activeSockets.set(socket.id, user);
-        
         if (!onlineUsers.has(user.id)) onlineUsers.set(user.id, new Set());
         onlineUsers.get(user.id).add(socket.id);
 
@@ -97,12 +100,11 @@ io.on('connection', (socket) => {
     }
 
     function broadcastOnlineState() {
-        const activeIds = Array.from(onlineUsers.keys());
-        io.emit('user:online_list', activeIds);
+        io.emit('user:online_list', Array.from(onlineUsers.keys()));
     }
 
     function loadUserData(socket, userId) {
-        db.all(`SELECT u.id, u.username, u.avatar, u.bubble_color FROM users u JOIN contacts c ON u.id = c.contact_id WHERE c.user_id = ?`, [userId], (e, c) => {
+        db.all(`SELECT u.id, u.username, u.avatar, u.bubble_color, u.bubble_shape FROM users u JOIN contacts c ON u.id = c.contact_id WHERE c.user_id = ?`, [userId], (e, c) => {
             socket.emit('data:contacts', c || []);
         });
 
@@ -114,7 +116,6 @@ io.on('connection', (socket) => {
         });
     }
 
-    // Indicador de Escribiendo...
     socket.on('typing:start', ({ targetId, isGroup }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -123,9 +124,7 @@ io.on('connection', (socket) => {
             socket.to(`group_${targetId}`).emit('typing:show', { senderId: u.id, senderName: u.username, targetId, isGroup: true });
         } else {
             const sockets = onlineUsers.get(parseInt(targetId));
-            if (sockets) {
-                sockets.forEach(sId => io.to(sId).emit('typing:show', { senderId: u.id, senderName: u.username, targetId: u.id, isGroup: false }));
-            }
+            if (sockets) sockets.forEach(sId => io.to(sId).emit('typing:show', { senderId: u.id, senderName: u.username, targetId: u.id, isGroup: false }));
         }
     });
 
@@ -137,14 +136,11 @@ io.on('connection', (socket) => {
             socket.to(`group_${targetId}`).emit('typing:hide', { senderId: u.id, targetId, isGroup: true });
         } else {
             const sockets = onlineUsers.get(parseInt(targetId));
-            if (sockets) {
-                sockets.forEach(sId => io.to(sId).emit('typing:hide', { senderId: u.id, targetId: u.id, isGroup: false }));
-            }
+            if (sockets) sockets.forEach(sId => io.to(sId).emit('typing:hide', { senderId: u.id, targetId: u.id, isGroup: false }));
         }
     });
 
-    // Envío de Mensajes
-    socket.on('message:send', ({ targetId, isGroup, content, mediaUrl, pollData }) => {
+    socket.on('message:send', ({ targetId, isGroup, content, mediaUrl, mediaType, pollData }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
 
@@ -152,12 +148,12 @@ io.on('connection', (socket) => {
         const gId = isGroup ? targetId : null;
         const pStr = pollData ? JSON.stringify(pollData) : null;
 
-        db.run(`INSERT INTO messages (sender_id, receiver_id, group_id, content, media_url, poll_data) VALUES (?, ?, ?, ?, ?, ?)`,
-            [u.id, rId, gId, content, mediaUrl || null, pStr], function() {
+        db.run(`INSERT INTO messages (sender_id, receiver_id, group_id, content, media_url, media_type, poll_data) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [u.id, rId, gId, content, mediaUrl || null, mediaType || null, pStr], function() {
             const msgData = {
                 id: this.lastID, sender_id: u.id, sender_name: u.username, sender_avatar: u.avatar,
-                bubble_color: u.bubble_color, receiver_id: rId, group_id: gId,
-                content, media_url: mediaUrl, poll_data: pStr, is_edited: 0, is_deleted: 0,
+                bubble_color: u.bubble_color, bubble_shape: u.bubble_shape, receiver_id: rId, group_id: gId,
+                content, media_url: mediaUrl, media_type: mediaType, poll_data: pStr, is_edited: 0, is_deleted: 0,
                 timestamp: new Date().toISOString()
             };
 
@@ -166,9 +162,7 @@ io.on('connection', (socket) => {
             } else {
                 socket.emit('message:received', msgData);
                 const targetSockets = onlineUsers.get(parseInt(targetId));
-                if (targetSockets) {
-                    targetSockets.forEach(sId => io.to(sId).emit('message:received', msgData));
-                }
+                if (targetSockets) targetSockets.forEach(sId => io.to(sId).emit('message:received', msgData));
             }
         });
     });
@@ -179,15 +173,48 @@ io.on('connection', (socket) => {
 
         let q, p;
         if (isGroup) {
-            q = `SELECT m.*, usr.username as sender_name, usr.avatar as sender_avatar, usr.bubble_color FROM messages m JOIN users usr ON m.sender_id = usr.id WHERE m.group_id = ? ORDER BY m.timestamp ASC`;
+            q = `SELECT m.*, usr.username as sender_name, usr.avatar as sender_avatar, usr.bubble_color, usr.bubble_shape FROM messages m JOIN users usr ON m.sender_id = usr.id WHERE m.group_id = ? ORDER BY m.timestamp ASC`;
             p = [targetId];
         } else {
-            q = `SELECT m.*, usr.username as sender_name, usr.avatar as sender_avatar, usr.bubble_color FROM messages m JOIN users usr ON m.sender_id = usr.id WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?) ORDER BY m.timestamp ASC`;
+            q = `SELECT m.*, usr.username as sender_name, usr.avatar as sender_avatar, usr.bubble_color, usr.bubble_shape FROM messages m JOIN users usr ON m.sender_id = usr.id WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?) ORDER BY m.timestamp ASC`;
             p = [u.id, targetId, targetId, u.id];
         }
 
         db.all(q, p, (err, rows) => {
             socket.emit('chat:history', { targetId, isGroup, messages: rows || [] });
+        });
+    });
+
+    // Control de Encuesta Estricto (1 Voto Único)
+    socket.on('poll:vote', ({ messageId, optionIdx }) => {
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+
+        db.get(`SELECT poll_data FROM messages WHERE id = ?`, [messageId], (e, row) => {
+            if (!row || !row.poll_data) return;
+            let poll = JSON.parse(row.poll_data);
+
+            if (!poll.voters) poll.voters = {}; // userId -> optionIdx
+
+            const previousVote = poll.voters[u.id];
+
+            if (previousVote === optionIdx) {
+                // Si vuelve a tocar la misma opción, retira el voto
+                delete poll.voters[u.id];
+                poll.votes[optionIdx] = Math.max(0, (poll.votes[optionIdx] || 1) - 1);
+            } else {
+                // Si tenía un voto previo en otra opción, restarlo
+                if (previousVote !== undefined) {
+                    poll.votes[previousVote] = Math.max(0, (poll.votes[previousVote] || 1) - 1);
+                }
+                // Asignar nuevo voto
+                poll.voters[u.id] = { optionIdx, username: u.username };
+                poll.votes[optionIdx] = (poll.votes[optionIdx] || 0) + 1;
+            }
+
+            db.run(`UPDATE messages SET poll_data = ? WHERE id = ?`, [JSON.stringify(poll), messageId], () => {
+                io.emit('poll:updated', { messageId, pollData: JSON.stringify(poll) });
+            });
         });
     });
 
@@ -203,33 +230,21 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('poll:vote', ({ messageId, optionIdx }) => {
-        db.get(`SELECT poll_data FROM messages WHERE id = ?`, [messageId], (e, row) => {
-            if (!row || !row.poll_data) return;
-            let poll = JSON.parse(row.poll_data);
-            poll.votes[optionIdx] = (poll.votes[optionIdx] || 0) + 1;
-            
-            db.run(`UPDATE messages SET poll_data = ? WHERE id = ?`, [JSON.stringify(poll), messageId], () => {
-                io.emit('poll:updated', { messageId, pollData: JSON.stringify(poll) });
-            });
-        });
-    });
-
     socket.on('user:update_settings', (data) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
 
-        db.run(`UPDATE users SET username = ?, avatar = ?, bubble_color = ? WHERE id = ?`,
-            [data.username, data.avatar, data.color, u.id], () => {
+        db.run(`UPDATE users SET username = ?, avatar = ?, bubble_color = ?, bubble_shape = ? WHERE id = ?`,
+            [data.username, data.avatar, data.color, data.shape, u.id], () => {
             Object.assign(u, data);
             socket.emit('user:settings_updated', data);
-            io.emit('user:profile_changed', { userId: u.id, username: data.username, avatar: data.avatar });
+            io.emit('user:profile_changed', { userId: u.id, username: data.username, avatar: data.avatar, bubble_color: data.color, bubble_shape: data.shape });
         });
     });
 
     socket.on('contact:add', ({ searchName }) => {
         const u = activeSockets.get(socket.id);
-        db.get(`SELECT id, username, avatar, bubble_color FROM users WHERE username = ?`, [searchName], (e, target) => {
+        db.get(`SELECT id, username, avatar, bubble_color, bubble_shape FROM users WHERE username = ?`, [searchName], (e, target) => {
             if (target && target.id !== u.id) {
                 db.run(`INSERT OR IGNORE INTO contacts (user_id, contact_id) VALUES (?, ?)`, [u.id, target.id], () => {
                     db.run(`INSERT OR IGNORE INTO contacts (user_id, contact_id) VALUES (?, ?)`, [target.id, u.id]);

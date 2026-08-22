@@ -1,6 +1,6 @@
 const socket = io();
 
-// Generador Sintético de Notificaciones de Audio (Web Audio API)
+// Notificaciones de Sonido
 function playTone(freq, duration) {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -19,13 +19,11 @@ function playTone(freq, duration) {
 function playChatSound() { playTone(800, 0.15); }
 function playGroupSound() { playTone(500, 0.25); }
 
-// Desbloquear audio en navegadores y Canaima al hacer clic
 document.addEventListener('click', () => {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
 }, { once: true });
 
-// PWA
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
 let currentUser = null;
@@ -36,16 +34,22 @@ let onlineUserIds = new Set();
 let currentTab = 'chats';
 let selectedAvatar = '🤖';
 let selectedColor = '#3a86ff';
+let selectedShape = 'shape-normal';
 let typingTimeout = null;
 
-// Grabación Audio Multiplataforma
+// Grabación Audio
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
 // Cargar UI Guardada
 document.body.className = localStorage.getItem('canaima_theme') || 'theme-light';
+const savedFontSize = localStorage.getItem('canaima_font_size') || '0.95rem';
+const savedMsgGap = localStorage.getItem('canaima_msg_gap') || '10px';
 const savedBg = localStorage.getItem('canaima_custom_bg');
+
+document.documentElement.style.setProperty('--chat-font-size', savedFontSize);
+document.documentElement.style.setProperty('--msg-gap', savedMsgGap);
 if (savedBg) document.documentElement.style.setProperty('--custom-chat-bg', `url('${savedBg}')`);
 
 // Autologin por Token
@@ -58,6 +62,17 @@ const pollModal = document.getElementById('poll-modal');
 const listContainer = document.getElementById('list-container');
 const messagesContainer = document.getElementById('messages-container');
 const messageInput = document.getElementById('message-input');
+
+// Emojis Picker
+const emojiPicker = document.getElementById('emoji-picker');
+document.getElementById('btn-toggle-emojis').addEventListener('click', () => emojiPicker.classList.toggle('hidden'));
+emojiPicker.querySelectorAll('span').forEach(sp => {
+    sp.addEventListener('click', () => {
+        messageInput.value += sp.innerText;
+        emojiPicker.classList.add('hidden');
+        messageInput.focus();
+    });
+});
 
 // Pestañas
 const tabChats = document.getElementById('tab-chats');
@@ -89,6 +104,8 @@ socket.on('auth:response', (res) => {
         currentUser = res.user;
         selectedAvatar = currentUser.avatar || '🤖';
         selectedColor = currentUser.bubble_color || '#3a86ff';
+        selectedShape = currentUser.bubble_shape || 'shape-normal';
+
         if (currentUser.token) localStorage.setItem('canaima_token', currentUser.token);
         
         authModal.classList.add('hidden');
@@ -99,7 +116,6 @@ socket.on('auth:response', (res) => {
     }
 });
 
-// Renderizador Seguro de Fotos de Perfil
 function renderAvatarBox(container, avatarStr) {
     container.innerHTML = '';
     if (avatarStr && avatarStr.startsWith('data:image')) {
@@ -111,7 +127,7 @@ function renderAvatarBox(container, avatarStr) {
     }
 }
 
-// Lista de Usuarios Conectados
+// Lista Online
 socket.on('user:online_list', (ids) => {
     onlineUserIds = new Set(ids);
     renderList();
@@ -123,7 +139,6 @@ socket.on('user:online_list', (ids) => {
     }
 });
 
-// Listas
 socket.on('data:contacts', (d) => { contactsList = d; if (currentTab === 'chats') renderList(); });
 socket.on('data:groups', (d) => { groupsList = d; if (currentTab === 'groups') renderList(); });
 
@@ -172,7 +187,7 @@ function selectChat(item) {
     document.getElementById('chat-header').classList.remove('hidden');
     document.getElementById('chat-footer').classList.remove('hidden');
 
-    // Navegación Celulares
+    // Navegación Móvil
     document.getElementById('app-sidebar').classList.add('mobile-hidden');
     document.getElementById('app-chat-area').classList.remove('mobile-hidden');
 
@@ -184,7 +199,7 @@ document.getElementById('btn-back-chat').addEventListener('click', () => {
     document.getElementById('app-chat-area').classList.add('mobile-hidden');
 });
 
-// Eventos de "Escribiendo..."
+// Escribiendo...
 messageInput.addEventListener('input', () => {
     if (!activeTarget) return;
     socket.emit('typing:start', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
@@ -208,7 +223,7 @@ socket.on('typing:hide', ({ senderId, targetId, isGroup }) => {
     }
 });
 
-// Enviar Mensaje
+// Enviar Mensajes
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
@@ -221,7 +236,7 @@ function sendMessage() {
     }
 }
 
-// Audio Multiplataforma
+// Audio Micrófono
 function getSupportedMimeType() {
     const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4', 'audio/aac'];
     for (let type of types) {
@@ -245,7 +260,7 @@ btnRecord.addEventListener('click', async () => {
                 const audioBlob = new Blob(audioChunks, { type: finalMime });
                 const reader = new FileReader();
                 reader.onload = (evt) => {
-                    socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content: '🎤 Mensaje de voz', mediaUrl: evt.target.result });
+                    socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content: '🎤 Mensaje de voz', mediaUrl: evt.target.result, mediaType: 'audio' });
                 };
                 reader.readAsDataURL(audioBlob);
                 stream.getTracks().forEach(track => track.stop());
@@ -262,20 +277,30 @@ btnRecord.addEventListener('click', async () => {
     }
 });
 
-// Adjuntar Imagen
+// Adjuntar Imagen, PDF o Audio
 document.getElementById('btn-attach').addEventListener('click', () => document.getElementById('file-input').click());
 document.getElementById('file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file && activeTarget) {
+        let type = 'image';
+        if (file.type.includes('pdf')) type = 'pdf';
+        else if (file.type.includes('audio')) type = 'audio';
+
         const reader = new FileReader();
         reader.onload = (evt) => {
-            socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content: '📷 Foto', mediaUrl: evt.target.result });
+            socket.emit('message:send', { 
+                targetId: activeTarget.id, 
+                isGroup: activeTarget.isGroup, 
+                content: file.name, 
+                mediaUrl: evt.target.result,
+                mediaType: type
+            });
         };
         reader.readAsDataURL(file);
     }
 });
 
-// Mensajes y Notificaciones
+// Cargar Mensajes
 socket.on('chat:history', ({ messages }) => {
     messagesContainer.innerHTML = '';
     messages.forEach(appendMessage);
@@ -294,11 +319,19 @@ socket.on('message:received', (msg) => {
     }
 });
 
+// Iconos de Animales para burbujas
+const animalIcons = {
+    'shape-perro': '🐶', 'shape-gato': '🐱', 'shape-rana': '🐸', 'shape-serpiente': '🐍',
+    'shape-buho': '🦉', 'shape-pajaro': '🐦', 'shape-cuervo': '🦅'
+};
+
 function appendMessage(msg) {
     if (!currentUser) return;
     const isMe = msg.sender_id === currentUser.id;
     const bubble = document.createElement('div');
-    bubble.className = 'message-bubble ' + (isMe ? 'sent' : 'received');
+    
+    const shapeClass = (isMe ? currentUser.bubble_shape : msg.bubble_shape) || 'shape-normal';
+    bubble.className = `message-bubble ${isMe ? 'sent' : 'received'} ${shapeClass}`;
     bubble.id = 'msg-bubble-' + msg.id;
 
     if (isMe) bubble.style.backgroundColor = currentUser.bubble_color || '#3a86ff';
@@ -306,29 +339,54 @@ function appendMessage(msg) {
 
     let mediaHtml = '';
     if (msg.media_url) {
-        if (msg.media_url.startsWith('data:audio')) {
-            mediaHtml = '<audio controls src="' + msg.media_url + '"></audio>';
+        if (msg.media_type === 'pdf' || msg.media_url.startsWith('data:application/pdf')) {
+            mediaHtml = `<a href="${msg.media_url}" download="${msg.content || 'documento.pdf'}" class="pdf-attachment">📄 <span>${msg.content || 'Ver PDF'}</span></a>`;
+        } else if (msg.media_type === 'audio' || msg.media_url.startsWith('data:audio')) {
+            mediaHtml = `<audio controls src="${msg.media_url}"></audio>`;
         } else {
-            mediaHtml = '<img src="' + msg.media_url + '" style="max-width:220px; border-radius:8px; margin-top:5px;">';
+            mediaHtml = `<img src="${msg.media_url}" style="max-width:220px; border-radius:8px; margin-top:5px;">`;
         }
     }
 
+    // Render Encuestas
     let pollHtml = '';
     if (msg.poll_data) {
         const p = JSON.parse(msg.poll_data);
+        const votersMap = p.voters || {};
+        const myVote = votersMap[currentUser.id];
+
         pollHtml = '<div class="poll-card"><strong>📊 ' + p.question + '</strong>';
         p.options.forEach((opt, idx) => {
-            const votes = p.votes[idx] || 0;
-            pollHtml += '<button class="poll-option-btn" onclick="votePoll(' + msg.id + ',' + idx + ')">' + opt + ' (' + votes + ' votos)</button>';
+            const votesCount = p.votes ? (p.votes[idx] || 0) : 0;
+            const isMySelected = myVote && myVote.optionIdx === idx;
+            
+            // Lista de quiénes votaron por esta opción
+            let votedNames = Object.values(votersMap)
+                .filter(v => v.optionIdx === idx)
+                .map(v => v.username)
+                .join(', ');
+
+            pollHtml += `
+                <div>
+                    <button class="poll-option-btn ${isMySelected ? 'voted' : ''}" onclick="votePoll(${msg.id}, ${idx})">
+                        <span>${opt} ${isMySelected ? '✔' : ''}</span>
+                        <span>${votesCount} votos</span>
+                    </button>
+                    ${votedNames ? `<div class="voters-list">Votaron: ${votedNames}</div>` : ''}
+                </div>`;
         });
         pollHtml += '</div>';
     }
 
     let headerHtml = '';
+    const animalTag = animalIcons[shapeClass] ? `<span class="animal-badge">${animalIcons[shapeClass]}</span>` : '';
+
     if (activeTarget && activeTarget.isGroup && !isMe) {
         let av = msg.sender_avatar || '👤';
         let avTag = av.startsWith('data:image') ? `<span class="msg-avatar"><img src="${av}"></span>` : `<span class="msg-avatar">${av}</span>`;
-        headerHtml = '<div class="msg-header-info">' + avTag + '<span class="msg-sender">' + msg.sender_name + '</span></div>';
+        headerHtml = '<div class="msg-header-info">' + avTag + '<span class="msg-sender">' + msg.sender_name + '</span> ' + animalTag + '</div>';
+    } else if (animalTag) {
+        headerHtml = '<div class="msg-header-info">' + animalTag + '</div>';
     }
 
     let actionsHtml = isMe && !msg.is_deleted ? 
@@ -345,7 +403,7 @@ function appendMessage(msg) {
     messagesContainer.appendChild(bubble);
 }
 
-// Editar/Borrar
+// Editar / Eliminar
 window.editMsg = (id) => {
     const newText = prompt("Editar mensaje:");
     if (newText) socket.emit('message:edit', { messageId: id, newContent: newText });
@@ -365,7 +423,13 @@ socket.on('message:deleted', ({ messageId }) => {
     if (el) { el.innerHTML = '<em>Mensaje eliminado</em>'; el.classList.add('deleted'); }
 });
 
-// Encuestas
+// Voto Encuesta Estricto
+window.votePoll = (msgId, optIdx) => socket.emit('poll:vote', { messageId: msgId, optionIdx: optIdx });
+socket.on('poll:updated', () => {
+    if (activeTarget) socket.emit('chat:load_messages', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
+});
+
+// Crear Encuestas
 document.getElementById('btn-create-poll').addEventListener('click', () => pollModal.classList.remove('hidden'));
 document.getElementById('btn-close-poll').addEventListener('click', () => pollModal.classList.add('hidden'));
 
@@ -378,16 +442,11 @@ document.getElementById('btn-send-poll').addEventListener('click', () => {
     if (q && o1 && o2 && activeTarget) {
         const opts = [o1, o2];
         if (o3) opts.push(o3);
-        const pollData = { question: q, options: opts, votes: {} };
+        const pollData = { question: q, options: opts, votes: {}, voters: {} };
 
         socket.emit('message:send', { targetId: activeTarget.id, isGroup: activeTarget.isGroup, content: '📊 Encuesta', pollData });
         pollModal.classList.add('hidden');
     }
-});
-
-window.votePoll = (msgId, optIdx) => socket.emit('poll:vote', { messageId: msgId, optionIdx: optIdx });
-socket.on('poll:updated', ({ messageId, pollData }) => {
-    if (activeTarget) socket.emit('chat:load_messages', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
 });
 
 // Fotos de Perfil Personalizadas y Selección
@@ -449,19 +508,40 @@ document.getElementById('btn-theme-dark').addEventListener('click', () => {
     localStorage.setItem('canaima_theme', 'theme-dark');
 });
 
+// Tamaño de Letra y Separación
+document.getElementById('select-font-size').addEventListener('change', (e) => {
+    document.documentElement.style.setProperty('--chat-font-size', e.target.value);
+    localStorage.setItem('canaima_font_size', e.target.value);
+});
+
+document.getElementById('select-msg-gap').addEventListener('change', (e) => {
+    document.documentElement.style.setProperty('--msg-gap', e.target.value);
+    localStorage.setItem('canaima_msg_gap', e.target.value);
+});
+
 document.getElementById('btn-save-settings').addEventListener('click', () => {
     const username = document.getElementById('settings-username').value.trim() || currentUser.username;
-    socket.emit('user:update_settings', { username, color: selectedColor, avatar: selectedAvatar });
+    selectedShape = document.getElementById('select-bubble-shape').value;
+    
+    socket.emit('user:update_settings', { 
+        username, 
+        color: selectedColor, 
+        avatar: selectedAvatar, 
+        shape: selectedShape 
+    });
 });
 
 socket.on('user:settings_updated', (d) => {
     currentUser.username = d.username;
     currentUser.avatar = d.avatar;
     currentUser.bubble_color = d.color;
+    currentUser.bubble_shape = d.shape;
     
     document.getElementById('current-user-name').innerText = d.username;
     renderAvatarBox(document.getElementById('current-user-avatar'), d.avatar);
     settingsModal.classList.add('hidden');
+
+    if (activeTarget) socket.emit('chat:load_messages', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => {
@@ -469,7 +549,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     location.reload();
 });
 
-// Contactos y Grupos
+// Agregar Contactos y Grupos
 document.getElementById('btn-add-contact').addEventListener('click', () => {
     const name = prompt("Apodo exacto:");
     if (name) socket.emit('contact:add', { searchName: name });

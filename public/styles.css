@@ -55,10 +55,23 @@ body { background: var(--bg-app); color: var(--text-primary); height: 100vh; dis
 .messages-container { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: var(--msg-gap); font-size: var(--chat-font-size); }
 .placeholder-chat { margin: auto; text-align: center; opacity: 0.7; }
 
-/* Mensajes */
-.message-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; position: relative; word-wrap: break-word; display: flex; flex-direction: column; gap: 4px; }
+/* Formas de Burbujas de Chat y Animales */
+.message-bubble { max-width: 75%; padding: 10px 14px; border-radius: 12px; position: relative; word-wrap: break-word; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .message-bubble.sent { align-self: flex-end; color: white; border-bottom-right-radius: 2px; }
 .message-bubble.received { align-self: flex-start; background: var(--sidebar-bg); border-bottom-left-radius: 2px; }
+
+/* Formas de Animales */
+.shape-redonda { border-radius: 20px !important; }
+.shape-cuadrada { border-radius: 4px !important; }
+.shape-perro { border-radius: 25px 15px 25px 5px !important; border-top: 3px solid #8d5524; }
+.shape-gato { border-radius: 20px 20px 5px 20px !important; border-top: 3px solid #f0a04b; }
+.shape-rana { border-radius: 18px !important; border-top: 3px solid #22c55e; }
+.shape-serpiente { border-radius: 30px 10px 30px 10px !important; border-left: 3px solid #10b981; }
+.shape-buho { border-radius: 15px 15px 25px 25px !important; border-top: 3px solid #64748b; }
+.shape-pajaro { border-radius: 25px 5px 25px 25px !important; border-top: 3px solid #38bdf8; }
+.shape-cuervo { border-radius: 5px 25px 5px 25px !important; border-left: 3px solid #0f172a; }
+
+.animal-badge { font-size: 0.8rem; margin-right: 4px; }
 
 .msg-header-info { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .msg-avatar { width: 22px; height: 22px; border-radius: 50%; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -74,35 +87,44 @@ body { background: var(--bg-app); color: var(--text-primary); height: 100vh; dis
 
 .msg-meta { font-size: 0.65rem; opacity: 0.75; text-align: right; margin-top: 2px; }
 
-/* Audio Controls */
+/* Archivos y Adjuntos */
+.pdf-attachment { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.06); padding: 8px 12px; border-radius: 8px; text-decoration: none; color: inherit; margin-top: 5px; border: 1px solid var(--border-color); }
+.pdf-attachment span { font-weight: bold; font-size: 0.85rem; }
+
 audio { max-width: 220px; height: 35px; }
 .btn-recording { background: #ef4444 !important; animation: pulse 1s infinite; }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-/* Footer */
-.chat-footer { padding: 10px; background: var(--sidebar-bg); display: flex; gap: 8px; border-top: 1px solid var(--border-color); align-items: center; }
+/* Footer y Emojis */
+.chat-footer { padding: 10px; background: var(--sidebar-bg); display: flex; gap: 8px; border-top: 1px solid var(--border-color); align-items: center; position: relative; }
 .chat-footer input { flex: 1; padding: 10px 15px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit; }
 .send-btn { background: #3a86ff; color: white; border: none; padding: 10px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; }
 .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: inherit; padding: 4px; }
 
+.emoji-picker-popup { position: absolute; bottom: 65px; left: 10px; background: var(--sidebar-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; font-size: 1.3rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 50; }
+.emoji-picker-popup span { cursor: pointer; text-align: center; border-radius: 6px; padding: 4px; }
+.emoji-picker-popup span:hover { background: var(--input-bg); }
+
 /* Modales */
 .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 100; }
 .flex-center { display: flex; justify-content: center; align-items: center; }
-.modal-card { background: var(--sidebar-bg); padding: 25px; border-radius: 12px; width: 340px; display: flex; flex-direction: column; gap: 12px; }
+.modal-card { background: var(--sidebar-bg); padding: 25px; border-radius: 12px; width: 340px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow-y: auto; }
 .full-screen-modal { width: 100vw; height: 100vh; background: var(--sidebar-bg); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; max-width: 500px; }
 
 .color-options { display: flex; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
-.color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; background-size: cover; }
+.color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; }
 .color-circle.selected { border-color: #ffffff; box-shadow: 0 0 6px #000; }
 
-.avatar-selector { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; font-size: 1.5rem; max-width: 500px; }
+.avatar-selector { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; font-size: 1.4rem; max-width: 500px; max-height: 150px; overflow-y: auto; padding: 5px; border: 1px solid var(--border-color); border-radius: 8px; }
 .avatar-option { text-align: center; padding: 6px; border-radius: 6px; cursor: pointer; }
 .avatar-option.selected { border: 2px solid #3a86ff; background: var(--input-bg); }
 
-/* Encuestas UI */
-.poll-card { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
-.poll-option-btn { width: 100%; padding: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit; border-radius: 6px; cursor: pointer; text-align: left; }
+/* Encuestas UI Mejorada */
+.poll-card { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
+.poll-option-btn { width: 100%; padding: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit; border-radius: 6px; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+.poll-option-btn.voted { border-color: #22c55e; background: rgba(34, 197, 94, 0.15); font-weight: bold; }
+.voters-list { font-size: 0.7rem; opacity: 0.8; margin-top: 2px; padding-left: 5px; font-style: italic; }
 
 /* Celular WhatsApp Navigation */
 @media (max-width: 768px) {

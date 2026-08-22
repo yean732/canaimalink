@@ -86,8 +86,17 @@
             </div>
 
             <footer id="chat-footer" class="chat-footer hidden">
-                <button id="btn-attach" class="icon-btn" title="Adjuntar Imagen">📎</button>
-                <input type="file" id="file-input" class="hidden" accept="image/*">
+                <!-- Picker de Emojis -->
+                <button id="btn-toggle-emojis" class="icon-btn" title="Emojis">😀</button>
+                <div id="emoji-picker" class="emoji-picker-popup hidden">
+                    <span>😀</span><span>😂</span><span>😍</span><span>😎</span><span>👍</span>
+                    <span>🔥</span><span>🎉</span><span>❤️</span><span>🙏</span><span>😊</span>
+                    <span>🥳</span><span>🤔</span><span>👏</span><span>💪</span><span>✨</span>
+                    <span>🚀</span><span>🇻🇪</span><span>💻</span><span>🎤</span><span>📷</span>
+                </div>
+
+                <button id="btn-attach" class="icon-btn" title="Adjuntar Imagen/PDF/Audio">📎</button>
+                <input type="file" id="file-input" class="hidden" accept="image/*,application/pdf,audio/*">
                 
                 <input type="text" id="message-input" placeholder="Escribe un mensaje...">
                 <button id="btn-record-audio" class="icon-btn" title="Enviar Audio">🎤</button>
@@ -101,15 +110,49 @@
         <div class="full-screen-modal">
             <div style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
                 <button id="btn-close-settings" class="icon-btn">⬅️ Volver</button>
-                <h2>Ajustes</h2>
+                <h2>Ajustes Personales</h2>
             </div>
 
             <div class="form-group">
-                <label><strong>Tema:</strong></label>
+                <label><strong>Tema de la App:</strong></label>
                 <div style="display: flex; gap: 10px;">
                     <button id="btn-theme-light" class="action-btn">☀️ Claro</button>
                     <button id="btn-theme-dark" class="action-btn">🌙 Oscuro</button>
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Tamaño de Letra del Chat:</strong></label>
+                <select id="select-font-size" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
+                    <option value="0.85rem">Pequeño</option>
+                    <option value="0.95rem" selected>Mediano</option>
+                    <option value="1.1rem">Grande</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Separación entre Mensajes:</strong></label>
+                <select id="select-msg-gap" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
+                    <option value="4px">Pequeño (Apretado)</option>
+                    <option value="10px" selected>Mediano (Normal)</option>
+                    <option value="18px">Grande (Espaciado)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Forma / Animal de la Burbuja de Mensaje:</strong></label>
+                <select id="select-bubble-shape" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
+                    <option value="shape-normal">Normal (Bordes Suaves)</option>
+                    <option value="shape-redonda">Redonda</option>
+                    <option value="shape-cuadrada">Cuadrada</option>
+                    <option value="shape-perro">🐶 Perro</option>
+                    <option value="shape-gato">🐱 Gato</option>
+                    <option value="shape-rana">🐸 Rana</option>
+                    <option value="shape-serpiente">🐍 Serpiente</option>
+                    <option value="shape-buho">🦉 Búho</option>
+                    <option value="shape-pajaro">🐦 Pájaro</option>
+                    <option value="shape-cuervo">🦅 Cuervo</option>
+                </select>
             </div>
 
             <div class="form-group">
@@ -133,11 +176,18 @@
             <div class="form-group">
                 <label><strong>Foto de Perfil Personalizada:</strong></label>
                 <input type="file" id="profile-img-input" accept="image/*" style="margin-bottom: 5px;">
-                <label style="font-size:0.8rem; opacity:0.8;">O elige un avatar:</label>
+                <label style="font-size:0.8rem; opacity:0.8;">O elige uno de los 20+ Avatares:</label>
                 <div class="avatar-selector">
                     <span class="avatar-option selected">🤖</span><span class="avatar-option">🦊</span>
                     <span class="avatar-option">🐱</span><span class="avatar-option">🚀</span>
                     <span class="avatar-option">🎓</span><span class="avatar-option">👑</span>
+                    <span class="avatar-option">🐶</span><span class="avatar-option">🐸</span>
+                    <span class="avatar-option">🐍</span><span class="avatar-option">🦉</span>
+                    <span class="avatar-option">🐦</span><span class="avatar-option">🦅</span>
+                    <span class="avatar-option">🦁</span><span class="avatar-option">🐯</span>
+                    <span class="avatar-option">🐼</span><span class="avatar-option">🦄</span>
+                    <span class="avatar-option">⚽</span><span class="avatar-option">🎮</span>
+                    <span class="avatar-option">🎨</span><span class="avatar-option">🍕</span>
                 </div>
             </div>
 
