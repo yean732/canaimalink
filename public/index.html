@@ -10,25 +10,25 @@
 </head>
 <body class="theme-light">
 
-    <!-- Modal Login -->
+    <!-- Login -->
     <div id="auth-modal" class="modal flex-center">
         <div class="modal-card">
             <h2>CanaimaLink</h2>
-            <input type="text" id="auth-username" placeholder="Apodo">
-            <input type="password" id="auth-password" placeholder="Contraseña">
+            <input type="text" id="auth-username" placeholder="Apodo" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="password" id="auth-password" placeholder="Contraseña" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
             <button id="btn-login" class="primary-btn">Ingresar / Registrarme</button>
             <p id="auth-error" class="error-msg"></p>
         </div>
     </div>
 
     <div class="app-container">
+        <!-- Sidebar -->
         <aside id="app-sidebar" class="sidebar">
             <header class="sidebar-header">
-                <div class="user-profile-summary">
-                    <span id="current-user-avatar" class="avatar-box">🤖</span>
-                    <span id="current-user-name">Cargando...</span>
+                <div class="user-profile-summary" style="display: flex; align-items: center; gap: 8px;">
+                    <div id="current-user-avatar" class="avatar-box">🤖</div>
+                    <span id="current-user-name" style="font-weight: bold;">Cargando...</span>
                 </div>
-                <button id="btn-install-pwa" class="icon-btn hidden" title="Instalar App">📲</button>
                 <button id="btn-open-settings" class="icon-btn">⚙️</button>
             </header>
 
@@ -36,51 +36,55 @@
                 <input type="text" id="search-input" placeholder="Buscar...">
             </div>
 
-            <nav class="nav-tabs">
-                <button id="tab-chats" class="tab-btn">Chats</button>
-                <button id="tab-groups" class="tab-btn">Grupos</button>
-                <div id="tab-indicator" class="tab-indicator"></div>
-            </nav>
-
             <div class="actions-bar">
                 <button id="btn-add-contact" class="action-btn">+ Contacto</button>
                 <button id="btn-create-group" class="action-btn">+ Grupo</button>
             </div>
 
             <div id="list-container" class="list-container"></div>
+
+            <!-- Navegación Abajo estilo WhatsApp -->
+            <nav class="nav-tabs-bottom">
+                <button id="tab-chats" class="tab-btn active">
+                    <span>💬</span>
+                    <span>Chats</span>
+                </button>
+                <button id="tab-groups" class="tab-btn">
+                    <span>👥</span>
+                    <span>Grupos</span>
+                </button>
+            </nav>
         </aside>
 
+        <!-- Chat Area -->
         <main id="app-chat-area" class="chat-area mobile-hidden">
             <header id="chat-header" class="chat-header hidden">
                 <div class="chat-title-info">
                     <button id="btn-back-chat" class="icon-btn btn-back-mobile">⬅️</button>
-                    <span id="chat-target-avatar" class="avatar-box">👤</span>
+                    <div id="chat-target-avatar" class="avatar-box">👤</div>
                     <div>
                         <h3 id="chat-target-name">Selecciona un chat</h3>
-                        <div id="typing-indicator" class="typing-indicator"></div>
+                        <div id="typing-indicator" style="font-size:0.75rem; color:#22c55e;"></div>
                     </div>
+                </div>
+                <div>
+                    <button id="btn-create-poll" class="icon-btn" title="Crear Encuesta">📊</button>
                 </div>
             </header>
 
             <div id="messages-container" class="messages-container">
                 <div class="placeholder-chat">
-                    <h2>CanaimaLink App</h2>
-                    <p>Selecciona un contacto para chatear.</p>
+                    <h2>CanaimaLink Messenger</h2>
+                    <p>Selecciona un contacto para comenzar a chatear.</p>
                 </div>
             </div>
 
             <footer id="chat-footer" class="chat-footer hidden">
-                <div class="emoji-picker-wrapper">
-                    <button id="btn-emoji" class="icon-btn">😊</button>
-                    <div id="emoji-dropdown" class="emoji-dropdown hidden">
-                        <span>😀</span><span>😂</span><span>😍</span><span>👍</span><span>🔥</span><span>🎉</span>
-                        <span>❤️</span><span>🚀</span><span>😎</span><span>🙌</span><span>💩</span><span>💀</span>
-                    </div>
-                </div>
-                <button id="btn-attach" class="icon-btn" title="Enviar Foto">📎</button>
+                <button id="btn-attach" class="icon-btn" title="Adjuntar Imagen">📎</button>
                 <input type="file" id="file-input" class="hidden" accept="image/*">
                 
                 <input type="text" id="message-input" placeholder="Escribe un mensaje...">
+                <button id="btn-record-audio" class="icon-btn" title="Enviar Audio">🎤</button>
                 <button id="btn-send" class="send-btn">Enviar</button>
             </footer>
         </main>
@@ -89,21 +93,21 @@
     <!-- Modal Ajustes -->
     <div id="settings-modal" class="modal hidden">
         <div class="full-screen-modal">
-            <div class="modal-header-nav">
+            <div style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
                 <button id="btn-close-settings" class="icon-btn">⬅️ Volver</button>
-                <h2>Ajustes y Personalización</h2>
+                <h2>Ajustes</h2>
             </div>
 
             <div class="form-group">
-                <label><strong>Tema de la Aplicación:</strong></label>
-                <div class="theme-switch-container">
+                <label><strong>Tema:</strong></label>
+                <div style="display: flex; gap: 10px;">
                     <button id="btn-theme-light" class="action-btn">☀️ Claro</button>
                     <button id="btn-theme-dark" class="action-btn">🌙 Oscuro</button>
                 </div>
             </div>
 
             <div class="form-group">
-                <label><strong>Tamaño de la Letra:</strong></label>
+                <label><strong>Tamaño de Letra:</strong></label>
                 <select id="font-size-selector" class="action-btn" style="background: var(--input-bg); color: inherit;">
                     <option value="0.8rem">Pequeño</option>
                     <option value="0.95rem" selected>Mediano</option>
@@ -114,14 +118,14 @@
             <div class="form-group">
                 <label><strong>Separación de Mensajes:</strong></label>
                 <select id="msg-gap-selector" class="action-btn" style="background: var(--input-bg); color: inherit;">
-                    <option value="4px">Pequeño (Muy juntos)</option>
-                    <option value="10px" selected>Mediano (Normal)</option>
-                    <option value="18px">Grande (Espaciado)</option>
+                    <option value="4px">Pequeño</option>
+                    <option value="10px" selected>Mediano</option>
+                    <option value="18px">Grande</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label><strong>Color de tus Burbujas de Chat:</strong></label>
+                <label><strong>Color de tus Burbujas (Visible para todos):</strong></label>
                 <div class="color-options">
                     <div class="color-circle selected" style="background: #3a86ff;" data-color="#3a86ff"></div>
                     <div class="color-circle" style="background: #ec4899;" data-color="#ec4899"></div>
@@ -133,14 +137,13 @@
             </div>
 
             <div class="form-group">
-                <label><strong>Elige tu Avatar:</strong></label>
+                <label><strong>Avatar o Foto de Perfil:</strong></label>
+                <input type="file" id="profile-img-input" accept="image/*" style="margin-bottom: 5px;">
                 <div class="avatar-selector">
                     <span class="avatar-option selected">🤖</span><span class="avatar-option">🦊</span>
                     <span class="avatar-option">🐱</span><span class="avatar-option">🚀</span>
                     <span class="avatar-option">🎓</span><span class="avatar-option">👑</span>
                     <span class="avatar-option">👾</span><span class="avatar-option">🦁</span>
-                    <span class="avatar-option">🐉</span><span class="avatar-option">🍕</span>
-                    <span class="avatar-option">⚽</span><span class="avatar-option">🎧</span>
                 </div>
             </div>
 
@@ -150,8 +153,23 @@
             </div>
 
             <div class="form-group">
-                <button id="btn-save-settings" class="primary-btn" style="max-width: 220px; margin-top: 10px;">Guardar Cambios</button>
+                <button id="btn-save-settings" class="primary-btn" style="max-width: 220px;">Guardar Cambios</button>
                 <button id="btn-logout" class="action-btn" style="background: #ef4444; max-width: 220px; margin-top: 15px;">Cerrar Sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Encuestas -->
+    <div id="poll-modal" class="modal hidden flex-center">
+        <div class="modal-card">
+            <h3>Crear Encuesta</h3>
+            <input type="text" id="poll-question" placeholder="Pregunta" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="text" id="poll-opt1" placeholder="Opción 1" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="text" id="poll-opt2" placeholder="Opción 2" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="text" id="poll-opt3" placeholder="Opción 3 (Opcional)" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-send-poll" class="primary-btn">Crear</button>
+                <button id="btn-close-poll" class="action-btn" style="background:#64748b;">Cancelar</button>
             </div>
         </div>
     </div>
