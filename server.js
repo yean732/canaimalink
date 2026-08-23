@@ -6,7 +6,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 3e7 }); // 30MB para adjuntos grandes
+const io = new Server(server, { maxHttpBufferSize: 3e7 }); // 30MB
 
 const dbDir = process.env.RENDER ? '/tmp' : '.';
 const dbPath = path.join(dbDir, 'database.db');
@@ -74,14 +74,15 @@ io.on('connection', (socket) => {
         if (token) {
             db.get(`SELECT * FROM users WHERE token = ?`, [token], (err, user) => {
                 if (user) loginSuccess(socket, user);
-                else socket.emit('auth:response', { success: false });
+                else socket.emit('auth:response', { success: false, message: 'Sesión inválida' });
             });
         } else {
             db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
                 if (!user) {
                     const newToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
                     db.run(`INSERT INTO users (username, password, avatar, bubble_color, bubble_shape, token) VALUES (?, ?, '🤖', '#3a86ff', 'shape-normal', ?)`, 
-                        [username, password, newToken], function() {
+                        [username, password, newToken], function(err) {
+                        if (err) return socket.emit('auth:response', { success: false, message: 'Error al registrar' });
                         loginSuccess(socket, { id: this.lastID, username, avatar: '🤖', bubble_color: '#3a86ff', bubble_shape: 'shape-normal', token: newToken });
                     });
                 } else if (user.password === password) {
@@ -153,7 +154,8 @@ io.on('connection', (socket) => {
         const pStr = pollData ? JSON.stringify(pollData) : null;
 
         db.run(`INSERT INTO messages (sender_id, receiver_id, group_id, content, media_url, media_type, poll_data) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [u.id, rId, gId, content, mediaUrl || null, mediaType || null, pStr], function() {
+            [u.id, rId, gId, content, mediaUrl || null, mediaType || null, pStr], function(err) {
+            if (err) return;
             const msgData = {
                 id: this.lastID, sender_id: u.id, sender_name: u.username, sender_avatar: u.avatar,
                 bubble_color: u.bubble_color, bubble_shape: u.bubble_shape, receiver_id: rId, group_id: gId,
@@ -189,9 +191,10 @@ io.on('connection', (socket) => {
         });
     });
 
-    // SISTEMA AVANZADO DE GRUPOS
+    // SISTEMA DE GRUPOS
     socket.on('group:create', ({ groupName }) => {
         const u = activeSockets.get(socket.id);
+        if (!u) return;
         db.run(`INSERT INTO groups (name, admin_id) VALUES (?, ?)`, [groupName, u.id], function() {
             const gId = this.lastID;
             db.run(`INSERT INTO group_members (group_id, user_id, is_admin) VALUES (?, ?, 1)`, [gId, u.id], () => {
@@ -202,7 +205,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('group:search', ({ searchName }) => {
-        const u = activeSockets.get(socket.id);
         db.all(`SELECT id, name, admin_id FROM groups WHERE name LIKE ?`, [`%${searchName}%`], (e, groups) => {
             socket.emit('group:search_results', groups || []);
         });
@@ -210,6 +212,7 @@ io.on('connection', (socket) => {
 
     socket.on('group:request_join', ({ groupId }) => {
         const u = activeSockets.get(socket.id);
+        if (!u) return;
         db.run(`INSERT OR IGNORE INTO group_requests (group_id, user_id) VALUES (?, ?)`, [groupId, u.id], () => {
             socket.emit('group:request_sent');
         });
@@ -217,6 +220,7 @@ io.on('connection', (socket) => {
 
     socket.on('group:get_details', ({ groupId }) => {
         const u = activeSockets.get(socket.id);
+        if (!u) return;
         db.get(`SELECT g.*, gm.is_admin FROM groups g JOIN group_members gm ON g.id = gm.group_id WHERE g.id = ? AND gm.user_id = ?`, [groupId, u.id], (e, group) => {
             if (!group) return;
 
@@ -235,40 +239,63 @@ io.on('connection', (socket) => {
     });
 
     socket.on('group:accept_request', ({ groupId, userId }) => {
-        db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id, is_admin) VALUES (?, ?, 0)`, [groupId, userId], () => {
-            db.run(`DELETE FROM group_requests WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
-                const targetSockets = onlineUsers.get(parseInt(userId));
-                if (targetSockets) {
-                    targetSockets.forEach(sId => {
-                        const clientSocket = io.sockets.sockets.get(sId);
-                        if (clientSocket) clientSocket.join(`group_${groupId}`);
-                    });
-                }
-                io.to(`group_${groupId}`).emit('group:member_updated');
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+        // Validación de Administrador
+        db.get(`SELECT is_admin FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, u.id], (e, res) => {
+            if (!res || !res.is_admin) return;
+
+            db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id, is_admin) VALUES (?, ?, 0)`, [groupId, userId], () => {
+                db.run(`DELETE FROM group_requests WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+                    const targetSockets = onlineUsers.get(parseInt(userId));
+                    if (targetSockets) {
+                        targetSockets.forEach(sId => {
+                            const clientSocket = io.sockets.sockets.get(sId);
+                            if (clientSocket) clientSocket.join(`group_${groupId}`);
+                        });
+                    }
+                    io.to(`group_${groupId}`).emit('group:member_updated');
+                });
             });
         });
     });
 
     socket.on('group:reject_request', ({ groupId, userId }) => {
-        db.run(`DELETE FROM group_requests WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
-            socket.emit('group:member_updated');
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+        db.get(`SELECT is_admin FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, u.id], (e, res) => {
+            if (!res || !res.is_admin) return;
+            db.run(`DELETE FROM group_requests WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+                socket.emit('group:member_updated');
+            });
         });
     });
 
     socket.on('group:make_admin', ({ groupId, userId }) => {
-        db.run(`UPDATE group_members SET is_admin = 1 WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
-            io.to(`group_${groupId}`).emit('group:member_updated');
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+        db.get(`SELECT admin_id FROM groups WHERE id = ?`, [groupId], (e, grp) => {
+            if (!grp || grp.admin_id !== u.id) return; // Solo el creador original asigna nuevos admins
+            db.run(`UPDATE group_members SET is_admin = 1 WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+                io.to(`group_${groupId}`).emit('group:member_updated');
+            });
         });
     });
 
     socket.on('group:kick_member', ({ groupId, userId }) => {
-        db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
-            io.to(`group_${groupId}`).emit('group:member_updated');
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+        db.get(`SELECT is_admin FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, u.id], (e, res) => {
+            if (!res || !res.is_admin) return;
+            db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, userId], () => {
+                io.to(`group_${groupId}`).emit('group:member_updated');
+            });
         });
     });
 
     socket.on('group:leave', ({ groupId }) => {
         const u = activeSockets.get(socket.id);
+        if (!u) return;
         db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, u.id], () => {
             socket.leave(`group_${groupId}`);
             socket.emit('group:left', { groupId });
@@ -278,6 +305,7 @@ io.on('connection', (socket) => {
 
     socket.on('group:delete', ({ groupId }) => {
         const u = activeSockets.get(socket.id);
+        if (!u) return;
         db.get(`SELECT admin_id FROM groups WHERE id = ?`, [groupId], (e, grp) => {
             if (grp && grp.admin_id === u.id) {
                 db.run(`DELETE FROM groups WHERE id = ?`, [groupId]);
@@ -289,7 +317,7 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Control de Encuesta
+    // Control de Encuestas
     socket.on('poll:vote', ({ messageId, optionIdx }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -319,15 +347,25 @@ io.on('connection', (socket) => {
         });
     });
 
+    // Edición de Mensajes (con verificación de autor)
     socket.on('message:edit', ({ messageId, newContent }) => {
-        db.run(`UPDATE messages SET content = ?, is_edited = 1 WHERE id = ?`, [newContent, messageId], () => {
-            io.emit('message:edited', { messageId, newContent });
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+        db.run(`UPDATE messages SET content = ?, is_edited = 1 WHERE id = ? AND sender_id = ?`, [newContent, messageId, u.id], function() {
+            if (this.changes > 0) {
+                io.emit('message:edited', { messageId, newContent });
+            }
         });
     });
 
+    // Eliminación de Mensajes (con verificación de autor)
     socket.on('message:delete', ({ messageId }) => {
-        db.run(`UPDATE messages SET is_deleted = 1, content = 'Mensaje eliminado' WHERE id = ?`, [messageId], () => {
-            io.emit('message:deleted', { messageId });
+        const u = activeSockets.get(socket.id);
+        if (!u) return;
+        db.run(`UPDATE messages SET is_deleted = 1, content = 'Mensaje eliminado' WHERE id = ? AND sender_id = ?`, [messageId, u.id], function() {
+            if (this.changes > 0) {
+                io.emit('message:deleted', { messageId });
+            }
         });
     });
 
@@ -345,6 +383,7 @@ io.on('connection', (socket) => {
 
     socket.on('contact:add', ({ searchName }) => {
         const u = activeSockets.get(socket.id);
+        if (!u) return;
         db.get(`SELECT id, username, avatar, bubble_color, bubble_shape FROM users WHERE username = ?`, [searchName], (e, target) => {
             if (target && target.id !== u.id) {
                 db.run(`INSERT OR IGNORE INTO contacts (user_id, contact_id) VALUES (?, ?)`, [u.id, target.id], () => {
