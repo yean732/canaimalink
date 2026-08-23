@@ -32,8 +32,12 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
-        admin_id INTEGER
+        admin_id INTEGER,
+        avatar TEXT
     )`);
+
+    // Intentar agregar la columna avatar a groups por si la tabla ya existía
+    db.run(`ALTER TABLE groups ADD COLUMN avatar TEXT`, () => {});
 
     db.run(`CREATE TABLE IF NOT EXISTS group_members (
         group_id INTEGER,
@@ -112,7 +116,7 @@ io.on('connection', (socket) => {
             socket.emit('data:contacts', c || []);
         });
 
-        db.all(`SELECT g.id, g.name, g.admin_id FROM groups g JOIN group_members gm ON g.id = gm.group_id WHERE gm.user_id = ?`, [userId], (e, g) => {
+        db.all(`SELECT g.id, g.name, g.admin_id, g.avatar FROM groups g JOIN group_members gm ON g.id = gm.group_id WHERE gm.user_id = ?`, [userId], (e, g) => {
             if (g) {
                 g.forEach(grp => socket.join(`group_${grp.id}`));
                 socket.emit('data:groups', g);
@@ -192,18 +196,28 @@ io.on('connection', (socket) => {
     // SISTEMA AVANZADO DE GRUPOS
     socket.on('group:create', ({ groupName }) => {
         const u = activeSockets.get(socket.id);
-        db.run(`INSERT INTO groups (name, admin_id) VALUES (?, ?)`, [groupName, u.id], function() {
+        db.run(`INSERT INTO groups (name, admin_id, avatar) VALUES (?, ?, '👥')`, [groupName, u.id], function() {
             const gId = this.lastID;
             db.run(`INSERT INTO group_members (group_id, user_id, is_admin) VALUES (?, ?, 1)`, [gId, u.id], () => {
                 socket.join(`group_${gId}`);
-                socket.emit('group:created', { id: gId, name: groupName, admin_id: u.id });
+                socket.emit('group:created', { id: gId, name: groupName, admin_id: u.id, avatar: '👥' });
             });
         });
     });
 
-    socket.on('group:search', ({ searchName }) => {
+    socket.on('group:update_profile', ({ groupId, name, avatar }) => {
         const u = activeSockets.get(socket.id);
-        db.all(`SELECT id, name, admin_id FROM groups WHERE name LIKE ?`, [`%${searchName}%`], (e, groups) => {
+        db.get(`SELECT is_admin FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, u.id], (e, row) => {
+            if (row && row.is_admin === 1) {
+                db.run(`UPDATE groups SET name = ?, avatar = ? WHERE id = ?`, [name, avatar, groupId], () => {
+                    io.to(`group_${groupId}`).emit('group:profile_updated', { groupId, name, avatar });
+                });
+            }
+        });
+    });
+
+    socket.on('group:search', ({ searchName }) => {
+        db.all(`SELECT id, name, admin_id, avatar FROM groups WHERE name LIKE ?`, [`%${searchName}%`], (e, groups) => {
             socket.emit('group:search_results', groups || []);
         });
     });
@@ -212,6 +226,8 @@ io.on('connection', (socket) => {
         const u = activeSockets.get(socket.id);
         db.run(`INSERT OR IGNORE INTO group_requests (group_id, user_id) VALUES (?, ?)`, [groupId, u.id], () => {
             socket.emit('group:request_sent');
+            // Notificar a los administradores del grupo
+            io.to(`group_${groupId}`).emit('group:member_updated');
         });
     });
 

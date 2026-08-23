@@ -36,6 +36,7 @@ let selectedAvatar = '🤖';
 let selectedColor = '#3a86ff';
 let selectedShape = 'shape-normal';
 let typingTimeout = null;
+let newGroupImage = null; // Guardará la imagen/foto seleccionada para el grupo
 
 // Grabación Audio
 let mediaRecorder = null;
@@ -119,9 +120,13 @@ socket.on('auth:response', (res) => {
 
 function renderAvatarBox(container, avatarStr) {
     container.innerHTML = '';
-    if (avatarStr && avatarStr.startsWith('data:image')) {
+    if (avatarStr && (avatarStr.startsWith('data:image') || avatarStr.startsWith('http'))) {
         const img = document.createElement('img');
         img.src = avatarStr;
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '50%';
         container.appendChild(img);
     } else {
         container.innerText = avatarStr || '👤';
@@ -176,7 +181,7 @@ function renderList() {
 }
 
 function selectChat(item) {
-    activeTarget = { id: item.id, name: item.username || item.name, isGroup: currentTab === 'groups' };
+    activeTarget = { id: item.id, name: item.username || item.name, isGroup: currentTab === 'groups', avatar: item.avatar };
 
     renderAvatarBox(document.getElementById('chat-target-avatar'), item.avatar || (activeTarget.isGroup ? '👥' : '👤'));
     document.getElementById('chat-target-name').innerText = activeTarget.name;
@@ -334,6 +339,7 @@ const animalIcons = {
     'shape-buho': '🦉', 'shape-pajaro': '🐦', 'shape-cuervo': '🦅'
 };
 
+// MODIFICACIÓN PRINCIPAL: RENDERIZAR NOMBRE Y FOTO/AVATAR ARRIBA DEL MENSAJE
 function appendMessage(msg) {
     if (!currentUser) return;
     const isMe = msg.sender_id === currentUser.id;
@@ -386,14 +392,25 @@ function appendMessage(msg) {
         pollHtml += '</div>';
     }
 
-    // NOMBRES VISIBLES EN GRUPOS
+    // CABECERA DEL MENSAJE (FOTO + NOMBRE ARRIBA DE CADA MENSAJE EN GRUPOS)
     let headerHtml = '';
     const animalTag = animalIcons[shapeClass] ? `<span class="animal-badge">${animalIcons[shapeClass]}</span>` : '';
 
     if (activeTarget && activeTarget.isGroup && !isMe) {
         let av = msg.sender_avatar || '👤';
-        let avTag = av.startsWith('data:image') ? `<span class="msg-avatar"><img src="${av}"></span>` : `<span class="msg-avatar">${av}</span>`;
-        headerHtml = `<div class="msg-header-info">${avTag}<span class="msg-sender">${msg.sender_name}</span> ${animalTag}</div>`;
+        let avTag = '';
+        
+        if (av.startsWith('data:image') || av.startsWith('http')) {
+            avTag = `<img src="${av}" style="width:20px; height:20px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-right:4px;">`;
+        } else {
+            avTag = `<span style="font-size:0.9rem; margin-right:4px;">${av}</span>`;
+        }
+        
+        headerHtml = `<div class="msg-header-info" style="display:flex; align-items:center; gap:4px; font-weight:bold; font-size:0.75rem; margin-bottom:3px; opacity:0.9;">
+            ${avTag}
+            <span class="msg-sender">${msg.sender_name || 'Usuario'}</span> 
+            ${animalTag}
+        </div>`;
     } else if (animalTag) {
         headerHtml = `<div class="msg-header-info">${animalTag}</div>`;
     }
@@ -458,19 +475,68 @@ document.getElementById('btn-send-poll').addEventListener('click', () => {
     }
 });
 
-// GESTIÓN DE CONFIGURACIÓN Y ADMINISTRACIÓN DE GRUPO
+// GESTIÓN Y ADMINISTRACIÓN DEL GRUPO
 document.getElementById('btn-group-config').addEventListener('click', () => {
     if (activeTarget && activeTarget.isGroup) {
         socket.emit('group:get_details', { groupId: activeTarget.id });
     }
 });
 
+// Capturar archivo de foto de grupo
+document.getElementById('group-img-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => { newGroupImage = evt.target.result; };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Guardar Nombre y Foto del Grupo (Acción del Admin)
+document.getElementById('btn-save-group-profile').addEventListener('click', () => {
+    const newName = document.getElementById('edit-group-name').value.trim();
+    if (!newName && !newGroupImage) return alert("Ingresa un nuevo nombre o selecciona una imagen");
+
+    socket.emit('group:update_profile', {
+        groupId: activeTarget.id,
+        name: newName || activeTarget.name,
+        avatar: newGroupImage || activeTarget.avatar
+    });
+});
+
+socket.on('group:profile_updated', ({ groupId, name, avatar }) => {
+    if (activeTarget && activeTarget.isGroup && activeTarget.id === groupId) {
+        activeTarget.name = name;
+        activeTarget.avatar = avatar;
+        document.getElementById('chat-target-name').innerText = name;
+        document.getElementById('group-info-title').innerText = name;
+        renderAvatarBox(document.getElementById('chat-target-avatar'), avatar || '👥');
+    }
+    const idx = groupsList.findIndex(g => g.id === groupId);
+    if (idx !== -1) {
+        groupsList[idx].name = name;
+        groupsList[idx].avatar = avatar;
+        renderList();
+    }
+    alert("Perfil del grupo actualizado con éxito");
+});
+
 socket.on('group:details_data', ({ group, members, requests, isCreator, isAdmin }) => {
     document.getElementById('group-info-title').innerText = group.name;
+    document.getElementById('edit-group-name').value = group.name;
+    
+    const adminEditSection = document.getElementById('group-admin-edit-section');
     const reqSection = document.getElementById('admin-requests-section');
     const reqList = document.getElementById('group-requests-list');
     const membersList = document.getElementById('group-members-list');
     const btnDelete = document.getElementById('btn-delete-group');
+
+    // Mostrar sección de editar solo si es Admin
+    if (isAdmin) {
+        adminEditSection.classList.remove('hidden');
+    } else {
+        adminEditSection.classList.add('hidden');
+    }
 
     // Solicitudes
     if (isAdmin && requests.length > 0) {
@@ -479,10 +545,13 @@ socket.on('group:details_data', ({ group, members, requests, isCreator, isAdmin 
         requests.forEach(r => {
             const d = document.createElement('div');
             d.className = 'group-member-item';
+            d.style.display = 'flex';
+            d.style.justifyContent = 'space-between';
+            d.style.alignItems = 'center';
             d.innerHTML = `<span>${r.username}</span>
-                <div>
-                    <button class="action-btn" style="background:#22c55e;" onclick="acceptReq(${group.id}, ${r.id})">Aceptar</button>
-                    <button class="action-btn" style="background:#ef4444;" onclick="rejectReq(${group.id}, ${r.id})">Rechazar</button>
+                <div style="display:flex; gap:6px;">
+                    <button class="action-btn" style="background:#22c55e; padding:4px 8px;" onclick="acceptReq(${group.id}, ${r.id})">Aceptar</button>
+                    <button class="action-btn" style="background:#ef4444; padding:4px 8px;" onclick="rejectReq(${group.id}, ${r.id})">Rechazar</button>
                 </div>`;
             reqList.appendChild(d);
         });
@@ -495,7 +564,11 @@ socket.on('group:details_data', ({ group, members, requests, isCreator, isAdmin 
     members.forEach(m => {
         const d = document.createElement('div');
         d.className = 'group-member-item';
-        let roleBadge = m.is_admin ? '<span class="role-badge admin">Admin</span>' : '<span class="role-badge">Miembro</span>';
+        d.style.display = 'flex';
+        d.style.justifyContent = 'space-between';
+        d.style.alignItems = 'center';
+
+        let roleBadge = m.is_admin ? '<span class="role-badge admin" style="background:#f59e0b; color:#fff; font-size:0.7rem; padding:2px 5px; border-radius:4px;">Admin</span>' : '<span class="role-badge">Miembro</span>';
         
         let actions = '';
         if (isAdmin && m.id !== currentUser.id) {
@@ -503,7 +576,7 @@ socket.on('group:details_data', ({ group, members, requests, isCreator, isAdmin 
             actions += `<button class="action-btn" style="background:#ef4444; padding:2px 6px; font-size:0.65rem;" onclick="kickMember(${group.id}, ${m.id})">Sacar</button>`;
         }
 
-        d.innerHTML = `<div class="group-member-info"><span>${m.username}</span> ${roleBadge}</div><div>${actions}</div>`;
+        d.innerHTML = `<div class="group-member-info" style="display:flex; align-items:center; gap:8px;"><span>${m.username}</span> ${roleBadge}</div><div>${actions}</div>`;
         membersList.appendChild(d);
     });
 
@@ -556,7 +629,7 @@ socket.on('group:deleted_broadcast', ({ groupId }) => {
     }
 });
 
-// Fotos y Selección
+// Fotos de Perfil del Usuario
 document.getElementById('profile-img-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -601,7 +674,7 @@ document.getElementById('btn-reset-bg').addEventListener('click', () => {
     localStorage.removeItem('canaima_custom_bg');
 });
 
-// Ajustes
+// Ajustes Personales
 document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
 document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
 
