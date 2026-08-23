@@ -1,6 +1,6 @@
 const socket = io();
 
-// NOTIFICACIONES DE SONIDO
+// Notificaciones de Sonido
 function playTone(freq, duration) {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -42,10 +42,7 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
-// Variables temporales para editar grupo
-let groupEditAvatarData = '';
-
-// CARGAR UI GUARDADA
+// Cargar UI Guardada
 document.body.className = localStorage.getItem('canaima_theme') || 'theme-light';
 const savedFontSize = localStorage.getItem('canaima_font_size') || '0.95rem';
 const savedMsgGap = localStorage.getItem('canaima_msg_gap') || '10px';
@@ -55,7 +52,7 @@ document.documentElement.style.setProperty('--chat-font-size', savedFontSize);
 document.documentElement.style.setProperty('--msg-gap', savedMsgGap);
 if (savedBg) document.documentElement.style.setProperty('--custom-chat-bg', `url('${savedBg}')`);
 
-// AUTOLOGIN
+// Autologin
 const savedToken = localStorage.getItem('canaima_token');
 if (savedToken) socket.emit('auth:login', { token: savedToken });
 
@@ -67,7 +64,7 @@ const listContainer = document.getElementById('list-container');
 const messagesContainer = document.getElementById('messages-container');
 const messageInput = document.getElementById('message-input');
 
-// EMOJIS
+// Emojis
 const emojiPicker = document.getElementById('emoji-picker');
 document.getElementById('btn-toggle-emojis').addEventListener('click', () => emojiPicker.classList.toggle('hidden'));
 emojiPicker.querySelectorAll('span').forEach(sp => {
@@ -78,7 +75,7 @@ emojiPicker.querySelectorAll('span').forEach(sp => {
     });
 });
 
-// PESTAÑAS
+// Pestañas
 const tabChats = document.getElementById('tab-chats');
 const tabGroups = document.getElementById('tab-groups');
 
@@ -96,7 +93,7 @@ tabGroups.addEventListener('click', () => {
     renderList();
 });
 
-// LOGIN
+// Login
 document.getElementById('btn-login').addEventListener('click', () => {
     const username = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value.trim();
@@ -131,7 +128,7 @@ function renderAvatarBox(container, avatarStr) {
     }
 }
 
-// LISTA ONLINE
+// Online List
 socket.on('user:online_list', (ids) => {
     onlineUserIds = new Set(ids);
     renderList();
@@ -179,7 +176,7 @@ function renderList() {
 }
 
 function selectChat(item) {
-    activeTarget = { id: item.id, name: item.username || item.name, avatar: item.avatar, isGroup: currentTab === 'groups' };
+    activeTarget = { id: item.id, name: item.username || item.name, isGroup: currentTab === 'groups' };
 
     renderAvatarBox(document.getElementById('chat-target-avatar'), item.avatar || (activeTarget.isGroup ? '👥' : '👤'));
     document.getElementById('chat-target-name').innerText = activeTarget.name;
@@ -199,7 +196,7 @@ function selectChat(item) {
     document.getElementById('chat-header').classList.remove('hidden');
     document.getElementById('chat-footer').classList.remove('hidden');
 
-    // Navegación en Celulares
+    // Navegación Celular
     document.getElementById('app-sidebar').classList.add('mobile-hidden');
     document.getElementById('app-chat-area').classList.remove('mobile-hidden');
 
@@ -211,7 +208,7 @@ document.getElementById('btn-back-chat').addEventListener('click', () => {
     document.getElementById('app-chat-area').classList.add('mobile-hidden');
 });
 
-// ESCRIBIENDO...
+// Escribiendo...
 messageInput.addEventListener('input', () => {
     if (!activeTarget) return;
     socket.emit('typing:start', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
@@ -235,7 +232,7 @@ socket.on('typing:hide', ({ senderId, targetId, isGroup }) => {
     }
 });
 
-// ENVIAR MENSAJES
+// Enviar Mensajes
 document.getElementById('btn-send').addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
@@ -248,7 +245,7 @@ function sendMessage() {
     }
 }
 
-// AUDIO MICRÓFONO
+// Audio Micrófono
 function getSupportedMimeType() {
     const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4', 'audio/aac'];
     for (let type of types) {
@@ -289,7 +286,7 @@ btnRecord.addEventListener('click', async () => {
     }
 });
 
-// ADJUNTAR ARCHIVOS
+// Adjuntar Archivos
 document.getElementById('btn-attach').addEventListener('click', () => document.getElementById('file-input').click());
 document.getElementById('file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -312,7 +309,7 @@ document.getElementById('file-input').addEventListener('change', (e) => {
     }
 });
 
-// CARGAR MENSAJES
+// Cargar Mensajes
 socket.on('chat:history', ({ messages }) => {
     messagesContainer.innerHTML = '';
     messages.forEach(appendMessage);
@@ -331,7 +328,7 @@ socket.on('message:received', (msg) => {
     }
 });
 
-// ÍCONOS DE ANIMALES
+// Iconos de Animales
 const animalIcons = {
     'shape-perro': '🐶', 'shape-gato': '🐱', 'shape-rana': '🐸', 'shape-serpiente': '🐍',
     'shape-buho': '🦉', 'shape-pajaro': '🐦', 'shape-cuervo': '🦅'
@@ -389,7 +386,7 @@ function appendMessage(msg) {
         pollHtml += '</div>';
     }
 
-    // Nombres Visibles en Grupos
+    // NOMBRES VISIBLES EN GRUPOS
     let headerHtml = '';
     const animalTag = animalIcons[shapeClass] ? `<span class="animal-badge">${animalIcons[shapeClass]}</span>` : '';
 
@@ -415,7 +412,7 @@ function appendMessage(msg) {
     messagesContainer.appendChild(bubble);
 }
 
-// EDITAR Y ELIMINAR MENSAJES
+// Editar / Eliminar
 window.editMsg = (id) => {
     const newText = prompt("Editar mensaje:");
     if (newText) socket.emit('message:edit', { messageId: id, newContent: newText });
@@ -435,13 +432,13 @@ socket.on('message:deleted', ({ messageId }) => {
     if (el) { el.innerHTML = '<em>Mensaje eliminado</em>'; el.classList.add('deleted'); }
 });
 
-// VOTO ENCUESTA
+// Voto Encuesta
 window.votePoll = (msgId, optIdx) => socket.emit('poll:vote', { messageId: msgId, optionIdx: optIdx });
 socket.on('poll:updated', () => {
     if (activeTarget) socket.emit('chat:load_messages', { targetId: activeTarget.id, isGroup: activeTarget.isGroup });
 });
 
-// CREAR ENCUESTAS
+// Crear Encuestas
 document.getElementById('btn-create-poll').addEventListener('click', () => pollModal.classList.remove('hidden'));
 document.getElementById('btn-close-poll').addEventListener('click', () => pollModal.classList.add('hidden'));
 
@@ -461,7 +458,7 @@ document.getElementById('btn-send-poll').addEventListener('click', () => {
     }
 });
 
-// GESTIÓN Y ADMINISTRACIÓN DE GRUPO
+// GESTIÓN DE CONFIGURACIÓN Y ADMINISTRACIÓN DE GRUPO
 document.getElementById('btn-group-config').addEventListener('click', () => {
     if (activeTarget && activeTarget.isGroup) {
         socket.emit('group:get_details', { groupId: activeTarget.id });
@@ -474,17 +471,6 @@ socket.on('group:details_data', ({ group, members, requests, isCreator, isAdmin 
     const reqList = document.getElementById('group-requests-list');
     const membersList = document.getElementById('group-members-list');
     const btnDelete = document.getElementById('btn-delete-group');
-    const editSection = document.getElementById('group-edit-section');
-
-    // Sección de edición estilo WhatsApp (Solo admins)
-    if (isAdmin) {
-        editSection.classList.remove('hidden');
-        document.getElementById('group-edit-name').value = group.name;
-        document.getElementById('group-edit-avatar-text').value = group.avatar.startsWith('data:') ? '' : group.avatar;
-        groupEditAvatarData = group.avatar;
-    } else {
-        editSection.classList.add('hidden');
-    }
 
     // Solicitudes
     if (isAdmin && requests.length > 0) {
@@ -527,43 +513,6 @@ socket.on('group:details_data', ({ group, members, requests, isCreator, isAdmin 
     groupInfoModal.classList.remove('hidden');
 });
 
-// Guardar edición de grupo (Nombre / Foto)
-document.getElementById('group-edit-avatar-file').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => { groupEditAvatarData = evt.target.result; };
-        reader.readAsDataURL(file);
-    }
-});
-
-document.getElementById('btn-save-group-edit').addEventListener('click', () => {
-    const newName = document.getElementById('group-edit-name').value.trim();
-    const avatarInputText = document.getElementById('group-edit-avatar-text').value.trim();
-    
-    let finalAvatar = groupEditAvatarData;
-    if (avatarInputText) finalAvatar = avatarInputText;
-
-    if (newName && activeTarget) {
-        socket.emit('group:update', { groupId: activeTarget.id, name: newName, avatar: finalAvatar });
-        groupInfoModal.classList.add('hidden');
-    }
-});
-
-socket.on('group:updated_broadcast', ({ groupId, name, avatar }) => {
-    const grp = groupsList.find(g => g.id === groupId);
-    if (grp) {
-        grp.name = name;
-        grp.avatar = avatar;
-        renderList();
-    }
-    if (activeTarget && activeTarget.isGroup && activeTarget.id === groupId) {
-        activeTarget.name = name;
-        document.getElementById('chat-target-name').innerText = name;
-        renderAvatarBox(document.getElementById('chat-target-avatar'), avatar);
-    }
-});
-
 document.getElementById('btn-close-group-info').addEventListener('click', () => groupInfoModal.classList.add('hidden'));
 
 window.acceptReq = (gId, uId) => socket.emit('group:accept_request', { groupId: gId, userId: uId });
@@ -573,20 +522,6 @@ window.kickMember = (gId, uId) => socket.emit('group:kick_member', { groupId: gI
 
 socket.on('group:member_updated', () => {
     if (activeTarget && activeTarget.isGroup) socket.emit('group:get_details', { groupId: activeTarget.id });
-});
-
-// SINCRONIZACIÓN EN TIEMPO REAL AL SER ACEPTADO EN UN GRUPO
-socket.on('group:join_accepted', (group) => {
-    if (!groupsList.some(g => g.id === group.id)) {
-        groupsList.push(group);
-        if (currentTab === 'groups') renderList();
-    }
-    currentTab = 'groups';
-    tabGroups.classList.add('active');
-    tabChats.classList.remove('active');
-    renderList();
-    selectChat(group);
-    alert(`¡Tu solicitud para unirte al grupo "${group.name}" ha sido aceptada!`);
 });
 
 document.getElementById('btn-leave-group').addEventListener('click', () => {
@@ -621,7 +556,7 @@ socket.on('group:deleted_broadcast', ({ groupId }) => {
     }
 });
 
-// FOTOS Y AJUSTES DE PERFIL
+// Fotos y Selección
 document.getElementById('profile-img-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -647,7 +582,7 @@ document.querySelectorAll('.color-circle').forEach(circle => {
     });
 });
 
-// FONDO DEL CHAT
+// Fondo del Chat
 document.getElementById('bg-file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -666,7 +601,7 @@ document.getElementById('btn-reset-bg').addEventListener('click', () => {
     localStorage.removeItem('canaima_custom_bg');
 });
 
-// CONFIGURACIÓN DE USUARIO
+// Ajustes
 document.getElementById('btn-open-settings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
 document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
 
@@ -720,7 +655,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     location.reload();
 });
 
-// CONTACTOS, CREAR GRUPOS Y BUSCAR GRUPOS
+// Contactos, Crear Grupos y BUSCAR Grupos
 document.getElementById('btn-add-contact').addEventListener('click', () => {
     const name = prompt("Apodo exacto del contacto:");
     if (name) socket.emit('contact:add', { searchName: name });

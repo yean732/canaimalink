@@ -1,243 +1,250 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Canaima Chat</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#3a86ff">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CanaimaLink</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="theme-light">
 
-  <!-- MODAL DE AUTENTICACIÓN -->
-  <div id="auth-modal" class="modal-overlay">
-    <div class="modal-card">
-      <h2>Bienvenido a Canaima Chat</h2>
-      <p>Ingresa tu apodo y contraseña para ingresar o registrarte automáticamente.</p>
-      <input type="text" id="auth-username" placeholder="Apodo de usuario" autocomplete="off">
-      <input type="password" id="auth-password" placeholder="Contraseña">
-      <div id="auth-error" class="error-msg"></div>
-      <button id="btn-login" class="btn-primary">Entrar / Registrarse</button>
+    <!-- Login -->
+    <div id="auth-modal" class="modal flex-center">
+        <div class="modal-card">
+            <h2>CanaimaLink</h2>
+            <input type="text" id="auth-username" placeholder="Apodo" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="password" id="auth-password" placeholder="Contraseña" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <button id="btn-login" class="primary-btn">Ingresar / Registrarme</button>
+            <p id="auth-error" class="error-msg"></p>
+        </div>
     </div>
-  </div>
 
-  <!-- MODAL DE CONFIGURACIÓN -->
-  <div id="settings-modal" class="modal-overlay hidden">
-    <div class="modal-card modal-large">
-      <div class="modal-header">
-        <h3>Ajustes de Perfil y Apariencia</h3>
-        <button id="btn-close-settings" class="btn-close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <label>Apodo / Nombre de usuario:</label>
-        <input type="text" id="settings-username" placeholder="Nuevo apodo">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside id="app-sidebar" class="sidebar">
+            <header class="sidebar-header">
+                <div class="user-profile-summary" style="display: flex; align-items: center; gap: 10px;">
+                    <div class="avatar-wrapper">
+                        <div id="current-user-avatar" class="avatar-box">🤖</div>
+                        <div class="online-dot"></div>
+                    </div>
+                    <span id="current-user-name" style="font-weight: bold;">Cargando...</span>
+                </div>
+                <button id="btn-open-settings" class="icon-btn">⚙️</button>
+            </header>
 
-        <label>Foto de Perfil / Avatar:</label>
-        <div class="avatar-selector">
-          <span class="avatar-option">🤖</span>
-          <span class="avatar-option">🐱</span>
-          <span class="avatar-option">🦊</span>
-          <span class="avatar-option">🐸</span>
-          <span class="avatar-option">🚀</span>
-          <span class="avatar-option">👑</span>
-        </div>
-        <div class="custom-file-upload">
-          <label for="profile-img-input" class="btn-secondary">Subir Foto Personal</label>
-          <input type="file" id="profile-img-input" accept="image/*" class="hidden">
-        </div>
+            <div class="search-bar-container">
+                <input type="text" id="search-input" placeholder="Buscar...">
+            </div>
 
-        <label>Color de Burbuja:</label>
-        <div class="color-selector">
-          <div class="color-circle" data-color="#3a86ff" style="background:#3a86ff;"></div>
-          <div class="color-circle" data-color="#25d366" style="background:#25d366;"></div>
-          <div class="color-circle" data-color="#ef4444" style="background:#ef4444;"></div>
-          <div class="color-circle" data-color="#f59e0b" style="background:#f59e0b;"></div>
-          <div class="color-circle" data-color="#8b5cf6" style="background:#8b5cf6;"></div>
-          <div class="color-circle" data-color="#ec4899" style="background:#ec4899;"></div>
-        </div>
+            <div class="actions-bar">
+                <button id="btn-add-contact" class="action-btn">+ Contacto</button>
+                <button id="btn-create-group" class="action-btn">+ Grupo</button>
+                <button id="btn-search-group" class="action-btn" style="background:#10b981;">🔍 Buscar Grupo</button>
+            </div>
 
-        <label>Forma de Burbuja Animada:</label>
-        <select id="select-bubble-shape">
-          <option value="shape-normal">Normal (Borde suave)</option>
-          <option value="shape-perro">🐶 Perro</option>
-          <option value="shape-gato">🐱 Gato</option>
-          <option value="shape-rana">🐸 Rana</option>
-          <option value="shape-serpiente">🐍 Serpiente</option>
-          <option value="shape-buho">🦉 Búho</option>
-          <option value="shape-pajaro">🐦 Pájaro</option>
-          <option value="shape-cuervo">🦅 Cuervo</option>
-        </select>
+            <div id="list-container" class="list-container"></div>
 
-        <hr>
+            <!-- Navegación Abajo estilo WhatsApp -->
+            <nav class="nav-tabs-bottom">
+                <button id="tab-chats" class="tab-btn active">
+                    <span>💬</span>
+                    <span>Chats</span>
+                </button>
+                <button id="tab-groups" class="tab-btn">
+                    <span>👥</span>
+                    <span>Grupos</span>
+                </button>
+            </nav>
+        </aside>
 
-        <label>Tema de Interfaz:</label>
-        <div class="btn-group">
-          <button id="btn-theme-light" class="btn-secondary">Claro</button>
-          <button id="btn-theme-dark" class="btn-secondary">Oscuro</button>
-        </div>
+        <!-- Chat Area -->
+        <main id="app-chat-area" class="chat-area mobile-hidden">
+            <header id="chat-header" class="chat-header hidden">
+                <div class="chat-title-info">
+                    <button id="btn-back-chat" class="icon-btn btn-back-mobile">⬅️</button>
+                    <div class="avatar-wrapper">
+                        <div id="chat-target-avatar" class="avatar-box">👤</div>
+                        <div id="chat-target-status-dot" class="online-dot hidden"></div>
+                    </div>
+                    <div>
+                        <h3 id="chat-target-name">Selecciona un chat</h3>
+                        <div id="typing-indicator" style="font-size:0.75rem; color:#22c55e; min-height: 16px;"></div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-create-poll" class="icon-btn" title="Crear Encuesta">📊</button>
+                    <button id="btn-group-config" class="icon-btn hidden" title="Ajustes de Grupo">⚙️</button>
+                </div>
+            </header>
 
-        <label>Tamaño de Fuente:</label>
-        <select id="select-font-size">
-          <option value="0.85rem">Pequeña</option>
-          <option value="0.95rem" selected>Mediana</option>
-          <option value="1.1rem">Grande</option>
-        </select>
+            <div id="messages-container" class="messages-container">
+                <div class="placeholder-chat">
+                    <h2>CanaimaLink Messenger</h2>
+                    <p>Selecciona un contacto o grupo para comenzar a chatear.</p>
+                </div>
+            </div>
 
-        <label>Espaciado entre Mensajes:</label>
-        <select id="select-msg-gap">
-          <option value="5px">Compacto</option>
-          <option value="10px" selected>Normal</option>
-          <option value="18px">Amplio</option>
-        </select>
+            <footer id="chat-footer" class="chat-footer hidden">
+                <!-- Picker de Emojis -->
+                <button id="btn-toggle-emojis" class="icon-btn" title="Emojis">😀</button>
+                <div id="emoji-picker" class="emoji-picker-popup hidden">
+                    <span>😀</span><span>😂</span><span>😍</span><span>😎</span><span>👍</span>
+                    <span>🔥</span><span>🎉</span><span>❤️</span><span>🙏</span><span>😊</span>
+                    <span>🥳</span><span>🤔</span><span>👏</span><span>💪</span><span>✨</span>
+                    <span>🚀</span><span>🇻🇪</span><span>💻</span><span>🎤</span><span>📷</span>
+                </div>
 
-        <label>Fondo de Chat Personalizado:</label>
-        <div class="btn-group">
-          <label for="bg-file-input" class="btn-secondary">Subir Fondo</label>
-          <input type="file" id="bg-file-input" accept="image/*" class="hidden">
-          <button id="btn-reset-bg" class="btn-secondary">Quitar Fondo</button>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="btn-logout" class="btn-danger">Cerrar Sesión</button>
-        <button id="btn-save-settings" class="btn-primary">Guardar Cambios</button>
-      </div>
+                <button id="btn-attach" class="icon-btn" title="Adjuntar Imagen/PDF/Audio">📎</button>
+                <input type="file" id="file-input" class="hidden" accept="image/*,application/pdf,audio/*">
+                
+                <input type="text" id="message-input" placeholder="Escribe un mensaje...">
+                <button id="btn-record-audio" class="icon-btn" title="Enviar Audio">🎤</button>
+                <button id="btn-send" class="send-btn">Enviar</button>
+            </footer>
+        </main>
     </div>
-  </div>
 
-  <!-- MODAL DE CREACIÓN DE ENCUESTAS -->
-  <div id="poll-modal" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Crear Encuesta</h3>
-        <button id="btn-close-poll" class="btn-close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <input type="text" id="poll-question" placeholder="Pregunta de la encuesta...">
-        <input type="text" id="poll-opt1" placeholder="Opción 1">
-        <input type="text" id="poll-opt2" placeholder="Opción 2">
-        <input type="text" id="poll-opt3" placeholder="Opción 3 (Opcional)">
-      </div>
-      <div class="modal-footer">
-        <button id="btn-send-poll" class="btn-primary">Publicar Encuesta</button>
-      </div>
+    <!-- Modal Ajustes Generales -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="full-screen-modal">
+            <div style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                <button id="btn-close-settings" class="icon-btn">⬅️ Volver</button>
+                <h2>Ajustes Personales</h2>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Tema de la App:</strong></label>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-theme-light" class="action-btn">☀️ Claro</button>
+                    <button id="btn-theme-dark" class="action-btn">🌙 Oscuro</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Tamaño de Letra del Chat:</strong></label>
+                <select id="select-font-size" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
+                    <option value="0.85rem">Pequeño</option>
+                    <option value="0.95rem" selected>Mediano</option>
+                    <option value="1.1rem">Grande</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Separación entre Mensajes:</strong></label>
+                <select id="select-msg-gap" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
+                    <option value="4px">Pequeño (Apretado)</option>
+                    <option value="10px" selected>Mediano (Normal)</option>
+                    <option value="18px">Grande (Espaciado)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Forma / Animal de la Burbuja de Mensaje:</strong></label>
+                <select id="select-bubble-shape" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
+                    <option value="shape-normal">Normal (Bordes Suaves)</option>
+                    <option value="shape-redonda">Redonda</option>
+                    <option value="shape-cuadrada">Cuadrada</option>
+                    <option value="shape-perro">🐶 Perro</option>
+                    <option value="shape-gato">🐱 Gato</option>
+                    <option value="shape-rana">🐸 Rana</option>
+                    <option value="shape-serpiente">🐍 Serpiente</option>
+                    <option value="shape-buho">🦉 Búho</option>
+                    <option value="shape-pajaro">🐦 Pájaro</option>
+                    <option value="shape-cuervo">🦅 Cuervo</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Fondo de Pantalla del Chat:</strong></label>
+                <input type="file" id="bg-file-input" accept="image/*" style="margin-bottom: 5px;">
+                <button id="btn-reset-bg" class="action-btn" style="background:#64748b; max-width: 180px;">Restablecer Fondo</button>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Color de tus Burbujas (Visible para todos):</strong></label>
+                <div class="color-options">
+                    <div class="color-circle selected" style="background: #3a86ff;" data-color="#3a86ff"></div>
+                    <div class="color-circle" style="background: #ec4899;" data-color="#ec4899"></div>
+                    <div class="color-circle" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
+                    <div class="color-circle" style="background: #ef4444;" data-color="#ef4444"></div>
+                    <div class="color-circle" style="background: #10b981;" data-color="#10b981"></div>
+                    <div class="color-circle" style="background: #f59e0b;" data-color="#f59e0b"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Foto de Perfil Personalizada:</strong></label>
+                <input type="file" id="profile-img-input" accept="image/*" style="margin-bottom: 5px;">
+                <label style="font-size:0.8rem; opacity:0.8;">O elige uno de los 20+ Avatares:</label>
+                <div class="avatar-selector">
+                    <span class="avatar-option selected">🤖</span><span class="avatar-option">🦊</span>
+                    <span class="avatar-option">🐱</span><span class="avatar-option">🚀</span>
+                    <span class="avatar-option">🎓</span><span class="avatar-option">👑</span>
+                    <span class="avatar-option">🐶</span><span class="avatar-option">🐸</span>
+                    <span class="avatar-option">🐍</span><span class="avatar-option">🦉</span>
+                    <span class="avatar-option">🐦</span><span class="avatar-option">🦅</span>
+                    <span class="avatar-option">🦁</span><span class="avatar-option">🐯</span>
+                    <span class="avatar-option">🐼</span><span class="avatar-option">🦄</span>
+                    <span class="avatar-option">⚽</span><span class="avatar-option">🎮</span>
+                    <span class="avatar-option">🎨</span><span class="avatar-option">🍕</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label><strong>Nuevo Apodo:</strong></label>
+                <input type="text" id="settings-username" placeholder="Tu apodo" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+            </div>
+
+            <div class="form-group">
+                <button id="btn-save-settings" class="primary-btn" style="max-width: 220px;">Guardar Cambios</button>
+                <button id="btn-logout" class="action-btn" style="background: #ef4444; max-width: 220px; margin-top: 15px;">Cerrar Sesión</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- MODAL DE INFORMACIÓN Y GESTIÓN DE GRUPO -->
-  <div id="group-info-modal" class="modal-overlay hidden">
-    <div class="modal-card modal-large">
-      <div class="modal-header">
-        <h3 id="group-info-title">Detalles del Grupo</h3>
-        <button id="btn-close-group-info" class="btn-close">&times;</button>
-      </div>
-      <div class="modal-body">
-        
-        <!-- EDICIÓN DEL GRUPO (SOLO ADMINS) -->
-        <div id="group-edit-section" class="hidden" style="margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-          <label style="font-weight: bold; font-size: 0.85rem;">Editar Grupo (Estilo WhatsApp):</label>
-          <input type="text" id="group-edit-name" placeholder="Nuevo nombre del grupo" style="margin-bottom: 8px;">
-          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-            <input type="text" id="group-edit-avatar-text" placeholder="Emoji o URL" style="flex:1;">
-            <label for="group-edit-avatar-file" class="btn-secondary" style="margin:0; font-size:0.8rem; padding:8px;">Subir Foto</label>
-            <input type="file" id="group-edit-avatar-file" accept="image/*" class="hidden">
-          </div>
-          <button id="btn-save-group-edit" class="btn-primary" style="width:100%;">Actualizar Grupo</button>
+    <!-- Modal Encuestas -->
+    <div id="poll-modal" class="modal hidden flex-center">
+        <div class="modal-card">
+            <h3>Crear Encuesta</h3>
+            <input type="text" id="poll-question" placeholder="Pregunta" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="text" id="poll-opt1" placeholder="Opción 1" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="text" id="poll-opt2" placeholder="Opción 2" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <input type="text" id="poll-opt3" placeholder="Opción 3 (Opcional)" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-send-poll" class="primary-btn">Crear</button>
+                <button id="btn-close-poll" class="action-btn" style="background:#64748b;">Cancelar</button>
+            </div>
         </div>
-
-        <!-- SOLICITUDES PENDIENTES -->
-        <div id="admin-requests-section" class="hidden">
-          <h4>Solicitudes de Ingreso Pendientes</h4>
-          <div id="group-requests-list" class="group-list-box"></div>
-          <hr>
-        </div>
-
-        <!-- LISTA DE MIEMBROS -->
-        <h4>Miembros del Grupo</h4>
-        <div id="group-members-list" class="group-list-box"></div>
-
-      </div>
-      <div class="modal-footer">
-        <button id="btn-leave-group" class="btn-secondary">Salir del Grupo</button>
-        <button id="btn-delete-group" class="btn-danger hidden">Eliminar Grupo</button>
-      </div>
     </div>
-  </div>
 
-  <!-- CONTENEDOR PRINCIPAL DE LA APLICACIÓN -->
-  <div class="app-container">
-    
-    <!-- BARRA LATERAL -->
-    <aside class="sidebar" id="app-sidebar">
-      <header class="sidebar-header">
-        <div class="user-profile">
-          <div id="current-user-avatar" class="avatar-box">👤</div>
-          <span id="current-user-name">Cargando...</span>
+    <!-- Modal Configuración del Grupo -->
+    <div id="group-info-modal" class="modal hidden flex-center">
+        <div class="modal-card" style="width: 400px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="group-info-title">Opciones del Grupo</h3>
+                <button id="btn-close-group-info" class="icon-btn">❌</button>
+            </div>
+
+            <div id="admin-requests-section" class="hidden" style="border: 1px dashed #f59e0b; padding: 10px; border-radius: 8px; background: rgba(245, 158, 11, 0.1);">
+                <strong style="color: #f59e0b;">Solicitudes Pendientes:</strong>
+                <div id="group-requests-list" style="margin-top: 5px;"></div>
+            </div>
+
+            <div>
+                <strong>Miembros del Grupo:</strong>
+                <div id="group-members-list" style="margin-top: 8px; max-height: 180px; overflow-y: auto;"></div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                <button id="btn-leave-group" class="action-btn" style="background: #ef4444;">🚪 Salir del Grupo</button>
+                <button id="btn-delete-group" class="action-btn hidden" style="background: #b91c1c;">💥 Eliminar Grupo (Solo Admin)</button>
+            </div>
         </div>
-        <button id="btn-open-settings" class="icon-btn" title="Ajustes">⚙️</button>
-      </header>
+    </div>
 
-      <div class="tabs-header">
-        <button id="tab-chats" class="tab-btn active">Chats</button>
-        <button id="tab-groups" class="tab-btn">Grupos</button>
-      </div>
-
-      <div class="action-bar">
-        <button id="btn-add-contact" class="btn-secondary">+ Contacto</button>
-        <button id="btn-create-group" class="btn-secondary">+ Crear Grupo</button>
-        <button id="btn-search-group" class="btn-secondary">🔍 Unirse</button>
-      </div>
-
-      <div id="list-container" class="list-container"></div>
-    </aside>
-
-    <!-- ÁREA PRINCIPAL DEL CHAT -->
-    <main class="chat-area mobile-hidden" id="app-chat-area">
-      
-      <!-- CABECERA DEL CHAT -->
-      <header id="chat-header" class="chat-header hidden">
-        <button id="btn-back-chat" class="icon-btn mobile-only">⬅️</button>
-        <div id="chat-target-avatar" class="avatar-box">👤</div>
-        <div class="chat-header-info">
-          <h3 id="chat-target-name">Selecciona un chat</h3>
-          <span id="chat-target-status-dot" class="online-status-text hidden">● En línea</span>
-        </div>
-        <button id="btn-group-config" class="icon-btn hidden" title="Ajustes de Grupo">⚙️ Grupo</button>
-      </header>
-
-      <!-- MENSAJES -->
-      <div id="messages-container" class="messages-container">
-        <div class="placeholder-chat">Selecciona un contacto o grupo para comenzar a chatear.</div>
-      </div>
-
-      <!-- INDICADOR DE ESCRIBIENDO -->
-      <div id="typing-indicator" class="typing-indicator"></div>
-
-      <!-- PICKER DE EMOJIS -->
-      <div id="emoji-picker" class="emoji-picker hidden">
-        <span>😀</span><span>😂</span><span>😍</span><span>😎</span><span>👍</span>
-        <span>❤️</span><span>🎉</span><span>🔥</span><span>👏</span><span>🙏</span>
-        <span>🥑</span><span>⭐</span><span>🐶</span><span>🐱</span><span>🚀</span>
-      </div>
-
-      <!-- PIE DE CHAT / INPUTS -->
-      <footer id="chat-footer" class="chat-footer hidden">
-        <button id="btn-toggle-emojis" class="icon-btn">😊</button>
-        <button id="btn-attach" class="icon-btn">📎</button>
-        <input type="file" id="file-input" class="hidden" accept="image/*,application/pdf,audio/*">
-        <button id="btn-create-poll" class="icon-btn" title="Crear Encuesta">📊</button>
-        
-        <input type="text" id="message-input" placeholder="Escribe un mensaje..." autocomplete="off">
-        
-        <button id="btn-record-audio" class="icon-btn" title="Grabar nota de voz">🎤</button>
-        <button id="btn-send" class="btn-primary">Enviar</button>
-      </footer>
-
-    </main>
-
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
