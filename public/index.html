@@ -3,248 +3,952 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaimaLink</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="styles.css">
-    <script src="/socket.io/socket.io.js"></script>
-</head>
-<body class="theme-light">
+    <title>Sistema de Chat y Grupos</title>
+    <!-- Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <!-- Login -->
-    <div id="auth-modal" class="modal flex-center">
-        <div class="modal-card">
-            <h2>CanaimaLink</h2>
-            <input type="text" id="auth-username" placeholder="Apodo" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
-            <input type="password" id="auth-password" placeholder="Contraseña" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
-            <button id="btn-login" class="primary-btn">Ingresar / Registrarme</button>
-            <p id="auth-error" class="error-msg"></p>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Barra Superior de Simulación de Usuario --- */
+        .user-switcher-bar {
+            background-color: #1e293b;
+            padding: 10px 20px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .user-switcher-bar label {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-right: 10px;
+        }
+
+        .user-switcher-bar select {
+            background-color: #0f172a;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* --- Contenedor Principal --- */
+        .app-container {
+            display: flex;
+            flex-grow: 1;
+            height: calc(100vh - 53px);
+        }
+
+        /* --- Lateral (Sidebar) --- */
+        .sidebar {
+            width: 320px;
+            background-color: #1e293b;
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .btn-action {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-action:hover {
+            background-color: #2563eb;
+        }
+
+        .group-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .group-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 6px;
+            transition: background 0.2s;
+        }
+
+        .group-item:hover, .group-item.active {
+            background-color: #334155;
+        }
+
+        .group-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 12px;
+            border: 2px solid #3b82f6;
+        }
+
+        .group-info {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        .group-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #f8fafc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .group-subtext {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        /* --- Área de Chat --- */
+        .chat-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #0f172a;
+        }
+
+        .chat-header {
+            background-color: #1e293b;
+            padding: 12px 20px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-title-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message-bubble {
+            max-width: 60%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.4;
+            position: relative;
+        }
+
+        .message-bubble.mine {
+            align-self: flex-end;
+            background-color: #2563eb;
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+
+        .message-bubble.other {
+            align-self: flex-start;
+            background-color: #334155;
+            color: #f8fafc;
+            border-bottom-left-radius: 2px;
+        }
+
+        .message-sender {
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #38bdf8;
+        }
+
+        .chat-input-container {
+            padding: 16px;
+            background-color: #1e293b;
+            border-top: 1px solid #334155;
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input-container input {
+            flex-grow: 1;
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        /* --- MODAL PANTALLA COMPLETA (Configuración) --- */
+        .fullscreen-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #0f172a;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .fullscreen-modal.active {
+            display: flex;
+        }
+
+        .modal-header {
+            background-color: #1e293b;
+            padding: 16px 30px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-body {
+            max-width: 900px;
+            width: 100%;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .section-card {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .section-card h3 {
+            font-size: 18px;
+            color: #38bdf8;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .form-group input {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        /* Lista de miembros */
+        .member-item, .request-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .member-item:last-child, .request-item:last-child {
+            border-bottom: none;
+        }
+
+        .member-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .role-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .role-creator { background-color: #f59e0b; color: #000; }
+        .role-admin { background-color: #3b82f6; color: #fff; }
+        .role-member { background-color: #64748b; color: #fff; }
+
+        .member-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-warning {
+            background-color: #f59e0b;
+            color: black;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .no-content-msg {
+            color: #64748b;
+            font-size: 14px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Barra Superior: Simulación de Usuario -->
+    <div class="user-switcher-bar">
+        <div>
+            <i class="fa-solid fa-user-gear" style="color: #38bdf8; margin-right: 8px;"></i>
+            <span>Simular Usuario Activo:</span>
         </div>
+        <select id="userSelect" onchange="switchUser(this.value)">
+            <option value="user1">Juan (Creador / Admin Principal)</option>
+            <option value="user2">María (Miembro / Admin Secundario)</option>
+            <option value="user3">Pedro (Miembro Normal)</option>
+            <option value="user4">Ana (Usuario Externo)</option>
+        </select>
     </div>
 
+    <!-- Contenedor Principal de la App -->
     <div class="app-container">
         <!-- Sidebar -->
-        <aside id="app-sidebar" class="sidebar">
-            <header class="sidebar-header">
-                <div class="user-profile-summary" style="display: flex; align-items: center; gap: 10px;">
-                    <div class="avatar-wrapper">
-                        <div id="current-user-avatar" class="avatar-box">🤖</div>
-                        <div class="online-dot"></div>
-                    </div>
-                    <span id="current-user-name" style="font-weight: bold;">Cargando...</span>
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Mis Grupos</h2>
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn-action" onclick="openCreateGroupModal()"><i class="fa-solid fa-plus"></i></button>
+                    <button class="btn-action" style="background-color: #10b981;" onclick="openExploreModal()"><i class="fa-solid fa-compass"></i></button>
                 </div>
-                <button id="btn-open-settings" class="icon-btn">⚙️</button>
-            </header>
-
-            <div class="search-bar-container">
-                <input type="text" id="search-input" placeholder="Buscar...">
             </div>
-
-            <div class="actions-bar">
-                <button id="btn-add-contact" class="action-btn">+ Contacto</button>
-                <button id="btn-create-group" class="action-btn">+ Grupo</button>
-                <button id="btn-search-group" class="action-btn" style="background:#10b981;">🔍 Buscar Grupo</button>
+            <div class="group-list" id="sidebarGroupList">
+                <!-- Se llena dinámicamente -->
             </div>
-
-            <div id="list-container" class="list-container"></div>
-
-            <!-- Navegación Abajo estilo WhatsApp -->
-            <nav class="nav-tabs-bottom">
-                <button id="tab-chats" class="tab-btn active">
-                    <span>💬</span>
-                    <span>Chats</span>
-                </button>
-                <button id="tab-groups" class="tab-btn">
-                    <span>👥</span>
-                    <span>Grupos</span>
-                </button>
-            </nav>
-        </aside>
+        </div>
 
         <!-- Chat Area -->
-        <main id="app-chat-area" class="chat-area mobile-hidden">
-            <header id="chat-header" class="chat-header hidden">
-                <div class="chat-title-info">
-                    <button id="btn-back-chat" class="icon-btn btn-back-mobile">⬅️</button>
-                    <div class="avatar-wrapper">
-                        <div id="chat-target-avatar" class="avatar-box">👤</div>
-                        <div id="chat-target-status-dot" class="online-dot hidden"></div>
+        <div class="chat-area" id="chatArea">
+            <div class="chat-header">
+                <div class="chat-title-container">
+                    <img id="activeGroupAvatar" src="" class="group-avatar" alt="Avatar">
+                    <div>
+                        <h2 id="activeGroupName" class="group-name" style="font-size: 18px;">Selecciona un grupo</h2>
+                        <span id="activeGroupMembersCount" class="group-subtext">0 miembros</span>
+                    </div>
+                </div>
+                <button class="btn-action" id="btnOpenSettings" onclick="openFullscreenSettings()" style="display: none;">
+                    <i class="fa-solid fa-gear"></i> Configuración
+                </button>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="no-content-msg" style="text-align: center; margin-top: 50px;">
+                    Selecciona o únete a un grupo para comenzar a chatear.
+                </div>
+            </div>
+
+            <div class="chat-input-container" id="chatInputContainer" style="display: none;">
+                <input type="text" id="messageInput" placeholder="Escribe un mensaje..." onkeypress="handleKeyPress(event)">
+                <button class="btn-action" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PANTALLA COMPLETA: Configuración del Grupo -->
+    <div class="fullscreen-modal" id="settingsModal">
+        <div class="modal-header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button class="btn-action" onclick="closeFullscreenSettings()"><i class="fa-solid fa-arrow-left"></i> Volver al Chat</button>
+                <h2 style="font-size: 20px;">Configuración del Grupo</h2>
+            </div>
+            <span id="settingsUserRoleBadge" class="role-badge"></span>
+        </div>
+
+        <div class="modal-body">
+            <!-- Sección: Ajustes de Nombre y Foto (Solo Admins) -->
+            <div class="section-card" id="editGroupSection">
+                <h3><i class="fa-solid fa-pen-to-square"></i> Información del Grupo</h3>
+                <div class="form-group">
+                    <label>Nombre del Grupo</label>
+                    <input type="text" id="editGroupNameInput">
+                </div>
+                <div class="form-group">
+                    <label>URL de Foto / Avatar del Grupo</label>
+                    <input type="text" id="editGroupAvatarInput">
+                </div>
+                <button class="btn-action" onclick="saveGroupInfo()"><i class="fa-solid fa-floppy-disk"></i> Guardar Cambios</button>
+            </div>
+
+            <!-- Sección: Solicitudes de Unirse Pendientes (Solo Admins) -->
+            <div class="section-card" id="pendingRequestsSection">
+                <h3><i class="fa-solid fa-user-clock"></i> Solicitudes de Ingreso Pendientes</h3>
+                <div id="pendingRequestsList">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Sección: Lista de Miembros y Roles (Todos pueden ver) -->
+            <div class="section-card">
+                <h3><i class="fa-solid fa-users"></i> Miembros del Grupo</h3>
+                <div id="membersList">
+                    <!-- Se llena dinámicamente con acciones según jerarquía -->
+                </div>
+            </div>
+
+            <!-- Sección: Salir del Grupo -->
+            <div style="text-align: right; margin-bottom: 40px;">
+                <button class="btn-danger" style="padding: 10px 20px; font-weight: bold;" onclick="leaveCurrentGroup()">
+                    <i class="fa-solid fa-door-open"></i> Salir del Grupo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT PRINCIPAL DE LÓGICA Y CORRECCIÓN DE BUGS -->
+    <script>
+        // --- BASE DE DATOS Y ESTADO EN MEMORIA / LOCALSTORAGE ---
+        let users = {
+            'user1': { id: 'user1', name: 'Juan' },
+            'user2': { id: 'user2', name: 'María' },
+            'user3': { id: 'user3', name: 'Pedro' },
+            'user4': { id: 'user4', name: 'Ana' }
+        };
+
+        let currentUserId = 'user1';
+        let activeGroupId = null;
+
+        // Cargar o inicializar grupos
+        let groups = JSON.parse(localStorage.getItem('app_groups_v2')) || [
+            {
+                id: 'group_1',
+                name: 'Grupo de Prueba General',
+                avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Prueba',
+                creatorId: 'user1',
+                members: [
+                    { userId: 'user1', role: 'creator' },
+                    { userId: 'user2', role: 'admin' },
+                    { userId: 'user3', role: 'member' }
+                ],
+                pendingRequests: ['user4'],
+                messages: [
+                    { senderId: 'user1', text: '¡Bienvenidos al grupo de prueba!', time: '10:00 AM' }
+                ]
+            }
+        ];
+
+        function saveData() {
+            localStorage.setItem('app_groups_v2', JSON.stringify(groups));
+        }
+
+        // --- INICIALIZACIÓN ---
+        window.onload = function() {
+            renderSidebar();
+            if (groups.length > 0) {
+                selectGroup(groups[0].id);
+            }
+        };
+
+        // --- CAMBIO DE USUARIO (SIMULACIÓN) ---
+        function switchUser(newUserId) {
+            currentUserId = newUserId;
+            closeFullscreenSettings();
+            renderSidebar();
+            
+            // Verificar si el usuario pertenece al grupo activo
+            if (activeGroupId) {
+                let group = groups.find(g => g.id === activeGroupId);
+                let isMember = group && group.members.some(m => m.userId === currentUserId);
+                if (isMember) {
+                    selectGroup(activeGroupId);
+                } else {
+                    activeGroupId = null;
+                    renderChatHeader();
+                    renderMessages();
+                }
+            }
+        }
+
+        // --- RENDERIZAR SIDEBAR DE GRUPOS ---
+        function renderSidebar() {
+            const listEl = document.getElementById('sidebarGroupList');
+            listEl.innerHTML = '';
+
+            // Filtrar grupos donde el usuario activo es miembro
+            let myGroups = groups.filter(g => g.members.some(m => m.userId === currentUserId));
+
+            if (myGroups.length === 0) {
+                listEl.innerHTML = '<div class="no-content-msg" style="padding:15px; text-align:center;">No estás en ningún grupo. ¡Crea uno o únete!</div>';
+                return;
+            }
+
+            myGroups.forEach(group => {
+                let div = document.createElement('div');
+                div.className = `group-item ${group.id === activeGroupId ? 'active' : ''}`;
+                div.onclick = () => selectGroup(group.id);
+
+                div.innerHTML = `
+                    <img src="${group.avatar}" class="group-avatar" alt="Avatar">
+                    <div class="group-info">
+                        <div class="group-name">${escapeHTML(group.name)}</div>
+                        <div class="group-subtext">${group.members.length} miembros</div>
+                    </div>
+                `;
+                listEl.appendChild(div);
+            });
+        }
+
+        // --- SELECCIONAR GRUPO ---
+        function selectGroup(groupId) {
+            activeGroupId = groupId;
+            renderSidebar();
+            renderChatHeader();
+            renderMessages();
+        }
+
+        // --- RENDERIZAR ENCABEZADO DE CHAT ---
+        function renderChatHeader() {
+            const group = groups.find(g => g.id === activeGroupId);
+            const btnSettings = document.getElementById('btnOpenSettings');
+            const chatInput = document.getElementById('chatInputContainer');
+
+            if (!group) {
+                document.getElementById('activeGroupName').innerText = 'Selecciona un grupo';
+                document.getElementById('activeGroupAvatar').src = 'https://api.dicebear.com/7.x/bottts/svg?seed=default';
+                document.getElementById('activeGroupMembersCount').innerText = '0 miembros';
+                btnSettings.style.display = 'none';
+                chatInput.style.display = 'none';
+                return;
+            }
+
+            document.getElementById('activeGroupName').innerText = group.name;
+            document.getElementById('activeGroupAvatar').src = group.avatar;
+            document.getElementById('activeGroupMembersCount').innerText = `${group.members.length} miembros`;
+            btnSettings.style.display = 'block';
+            chatInput.style.display = 'flex';
+        }
+
+        // --- RENDERIZAR MENSAJES ---
+        function renderMessages() {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+
+            const group = groups.find(g => g.id === activeGroupId);
+            if (!group) {
+                container.innerHTML = '<div class="no-content-msg" style="text-align: center; margin-top: 50px;">Selecciona un grupo válido.</div>';
+                return;
+            }
+
+            group.messages.forEach(msg => {
+                let isMine = msg.senderId === currentUserId;
+                let senderName = users[msg.senderId] ? users[msg.senderId].name : 'Desconocido';
+
+                let bubble = document.createElement('div');
+                bubble.className = `message-bubble ${isMine ? 'mine' : 'other'}`;
+                bubble.innerHTML = `
+                    ${!isMine ? `<div class="message-sender">${escapeHTML(senderName)}</div>` : ''}
+                    <div>${escapeHTML(msg.text)}</div>
+                `;
+                container.appendChild(bubble);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- ENVIAR MENSAJE ---
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text || !activeGroupId) return;
+
+            const group = groups.find(g => g.id === activeGroupId);
+            if (group) {
+                group.messages.push({
+                    senderId: currentUserId,
+                    text: text,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+                saveData();
+                renderMessages();
+                input.value = '';
+            }
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        // ==========================================
+        // --- MODAL Y GESTIÓN DE CONFIGURACIÓN ---
+        // ==========================================
+
+        function openFullscreenSettings() {
+            const group = groups.find(g => g.id === activeGroupId);
+            if (!group) return;
+
+            const myMemberInfo = group.members.find(m => m.userId === currentUserId);
+            if (!myMemberInfo) return;
+
+            const myRole = myMemberInfo.role;
+
+            // Configurar Modal
+            document.getElementById('settingsModal').classList.add('active');
+            document.getElementById('settingsUserRoleBadge').innerText = `Tu Rol: ${getRoleLabel(myRole)}`;
+            document.getElementById('settingsUserRoleBadge').className = `role-badge ${getRoleClass(myRole)}`;
+
+            // Visibilidad de edición según rol
+            const canEditGroup = (myRole === 'creator' || myRole === 'admin');
+            document.getElementById('editGroupSection').style.display = canEditGroup ? 'block' : 'none';
+            document.getElementById('pendingRequestsSection').style.display = canEditGroup ? 'block' : 'none';
+
+            if (canEditGroup) {
+                document.getElementById('editGroupNameInput').value = group.name;
+                document.getElementById('editGroupAvatarInput').value = group.avatar;
+                renderPendingRequests(group);
+            }
+
+            renderMembersList(group, myRole);
+        }
+
+        function closeFullscreenSettings() {
+            document.getElementById('settingsModal').classList.remove('active');
+        }
+
+        // --- GUARDAR CAMBIOS DE NOMBRE / FOTO ---
+        function saveGroupInfo() {
+            const group = groups.find(g => g.id === activeGroupId);
+            if (!group) return;
+
+            const newName = document.getElementById('editGroupNameInput').value.trim();
+            const newAvatar = document.getElementById('editGroupAvatarInput').value.trim();
+
+            if (newName) group.name = newName;
+            if (newAvatar) group.avatar = newAvatar;
+
+            saveData();
+            renderSidebar();
+            renderChatHeader();
+            alert('Información del grupo actualizada.');
+        }
+
+        // --- RENDERIZAR SOLICITUDES PENDIENTES ---
+        function renderPendingRequests(group) {
+            const container = document.getElementById('pendingRequestsList');
+            container.innerHTML = '';
+
+            if (!group.pendingRequests || group.pendingRequests.length === 0) {
+                container.innerHTML = '<div class="no-content-msg">No hay solicitudes pendientes.</div>';
+                return;
+            }
+
+            group.pendingRequests.forEach(reqUserId => {
+                let userObj = users[reqUserId] || { name: 'Usuario Desconocido' };
+                let item = document.createElement('div');
+                item.className = 'request-item';
+                item.innerHTML = `
+                    <div class="member-info">
+                        <i class="fa-solid fa-user-plus" style="color: #38bdf8;"></i>
+                        <span>${escapeHTML(userObj.name)}</span>
                     </div>
                     <div>
-                        <h3 id="chat-target-name">Selecciona un chat</h3>
-                        <div id="typing-indicator" style="font-size:0.75rem; color:#22c55e; min-height: 16px;"></div>
+                        <!-- BUG FIX PRINCIPAL: Al aceptar la solicitud, se registra en miembros y se actualiza la interfaz -->
+                        <button class="btn-success" onclick="acceptJoinRequest('${group.id}', '${reqUserId}')">Aceptar</button>
+                        <button class="btn-danger" onclick="rejectJoinRequest('${group.id}', '${reqUserId}')">Rechazar</button>
                     </div>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button id="btn-create-poll" class="icon-btn" title="Crear Encuesta">📊</button>
-                    <button id="btn-group-config" class="icon-btn hidden" title="Ajustes de Grupo">⚙️</button>
-                </div>
-            </header>
+                `;
+                container.appendChild(item);
+            });
+        }
 
-            <div id="messages-container" class="messages-container">
-                <div class="placeholder-chat">
-                    <h2>CanaimaLink Messenger</h2>
-                    <p>Selecciona un contacto o grupo para comenzar a chatear.</p>
-                </div>
-            </div>
+        // --- ACEPTAR / RECHAZAR SOLICITUDES (CORRECCIÓN CLAVE) ---
+        function acceptJoinRequest(groupId, applicantUserId) {
+            const group = groups.find(g => g.id === groupId);
+            if (!group) return;
 
-            <footer id="chat-footer" class="chat-footer hidden">
-                <!-- Picker de Emojis -->
-                <button id="btn-toggle-emojis" class="icon-btn" title="Emojis">😀</button>
-                <div id="emoji-picker" class="emoji-picker-popup hidden">
-                    <span>😀</span><span>😂</span><span>😍</span><span>😎</span><span>👍</span>
-                    <span>🔥</span><span>🎉</span><span>❤️</span><span>🙏</span><span>😊</span>
-                    <span>🥳</span><span>🤔</span><span>👏</span><span>💪</span><span>✨</span>
-                    <span>🚀</span><span>🇻🇪</span><span>💻</span><span>🎤</span><span>📷</span>
-                </div>
+            // 1. Quitar de lista de pendientes
+            group.pendingRequests = group.pendingRequests.filter(id => id !== applicantUserId);
 
-                <button id="btn-attach" class="icon-btn" title="Adjuntar Imagen/PDF/Audio">📎</button>
-                <input type="file" id="file-input" class="hidden" accept="image/*,application/pdf,audio/*">
-                
-                <input type="text" id="message-input" placeholder="Escribe un mensaje...">
-                <button id="btn-record-audio" class="icon-btn" title="Enviar Audio">🎤</button>
-                <button id="btn-send" class="send-btn">Enviar</button>
-            </footer>
-        </main>
-    </div>
+            // 2. Agregar a la lista de miembros con rol 'member'
+            if (!group.members.some(m => m.userId === applicantUserId)) {
+                group.members.push({ userId: applicantUserId, role: 'member' });
+            }
 
-    <!-- Modal Ajustes Generales -->
-    <div id="settings-modal" class="modal hidden">
-        <div class="full-screen-modal">
-            <div style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-                <button id="btn-close-settings" class="icon-btn">⬅️ Volver</button>
-                <h2>Ajustes Personales</h2>
-            </div>
+            saveData();
 
-            <div class="form-group">
-                <label><strong>Tema de la App:</strong></label>
-                <div style="display: flex; gap: 10px;">
-                    <button id="btn-theme-light" class="action-btn">☀️ Claro</button>
-                    <button id="btn-theme-dark" class="action-btn">🌙 Oscuro</button>
-                </div>
-            </div>
+            // 3. Actualizar vistas
+            renderPendingRequests(group);
+            renderMembersList(group, getMyRole(group));
+            renderSidebar();
+            renderChatHeader();
 
-            <div class="form-group">
-                <label><strong>Tamaño de Letra del Chat:</strong></label>
-                <select id="select-font-size" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
-                    <option value="0.85rem">Pequeño</option>
-                    <option value="0.95rem" selected>Mediano</option>
-                    <option value="1.1rem">Grande</option>
-                </select>
-            </div>
+            alert(`Solicitud aceptada. El usuario ahora es miembro y el grupo aparecerá en su lista.`);
+        }
 
-            <div class="form-group">
-                <label><strong>Separación entre Mensajes:</strong></label>
-                <select id="select-msg-gap" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
-                    <option value="4px">Pequeño (Apretado)</option>
-                    <option value="10px" selected>Mediano (Normal)</option>
-                    <option value="18px">Grande (Espaciado)</option>
-                </select>
-            </div>
+        function rejectJoinRequest(groupId, applicantUserId) {
+            const group = groups.find(g => g.id === groupId);
+            if (!group) return;
 
-            <div class="form-group">
-                <label><strong>Forma / Animal de la Burbuja de Mensaje:</strong></label>
-                <select id="select-bubble-shape" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: inherit;">
-                    <option value="shape-normal">Normal (Bordes Suaves)</option>
-                    <option value="shape-redonda">Redonda</option>
-                    <option value="shape-cuadrada">Cuadrada</option>
-                    <option value="shape-perro">🐶 Perro</option>
-                    <option value="shape-gato">🐱 Gato</option>
-                    <option value="shape-rana">🐸 Rana</option>
-                    <option value="shape-serpiente">🐍 Serpiente</option>
-                    <option value="shape-buho">🦉 Búho</option>
-                    <option value="shape-pajaro">🐦 Pájaro</option>
-                    <option value="shape-cuervo">🦅 Cuervo</option>
-                </select>
-            </div>
+            group.pendingRequests = group.pendingRequests.filter(id => id !== applicantUserId);
+            saveData();
+            renderPendingRequests(group);
+        }
 
-            <div class="form-group">
-                <label><strong>Fondo de Pantalla del Chat:</strong></label>
-                <input type="file" id="bg-file-input" accept="image/*" style="margin-bottom: 5px;">
-                <button id="btn-reset-bg" class="action-btn" style="background:#64748b; max-width: 180px;">Restablecer Fondo</button>
-            </div>
+        // --- RENDERIZAR LISTA DE MIEMBROS Y PERMISOS DE ACCIÓN ---
+        function renderMembersList(group, myRole) {
+            const container = document.getElementById('membersList');
+            container.innerHTML = '';
 
-            <div class="form-group">
-                <label><strong>Color de tus Burbujas (Visible para todos):</strong></label>
-                <div class="color-options">
-                    <div class="color-circle selected" style="background: #3a86ff;" data-color="#3a86ff"></div>
-                    <div class="color-circle" style="background: #ec4899;" data-color="#ec4899"></div>
-                    <div class="color-circle" style="background: #8b5cf6;" data-color="#8b5cf6"></div>
-                    <div class="color-circle" style="background: #ef4444;" data-color="#ef4444"></div>
-                    <div class="color-circle" style="background: #10b981;" data-color="#10b981"></div>
-                    <div class="color-circle" style="background: #f59e0b;" data-color="#f59e0b"></div>
-                </div>
-            </div>
+            group.members.forEach(member => {
+                let userObj = users[member.userId] || { name: 'Desconocido' };
+                let isMe = member.userId === currentUserId;
 
-            <div class="form-group">
-                <label><strong>Foto de Perfil Personalizada:</strong></label>
-                <input type="file" id="profile-img-input" accept="image/*" style="margin-bottom: 5px;">
-                <label style="font-size:0.8rem; opacity:0.8;">O elige uno de los 20+ Avatares:</label>
-                <div class="avatar-selector">
-                    <span class="avatar-option selected">🤖</span><span class="avatar-option">🦊</span>
-                    <span class="avatar-option">🐱</span><span class="avatar-option">🚀</span>
-                    <span class="avatar-option">🎓</span><span class="avatar-option">👑</span>
-                    <span class="avatar-option">🐶</span><span class="avatar-option">🐸</span>
-                    <span class="avatar-option">🐍</span><span class="avatar-option">🦉</span>
-                    <span class="avatar-option">🐦</span><span class="avatar-option">🦅</span>
-                    <span class="avatar-option">🦁</span><span class="avatar-option">🐯</span>
-                    <span class="avatar-option">🐼</span><span class="avatar-option">🦄</span>
-                    <span class="avatar-option">⚽</span><span class="avatar-option">🎮</span>
-                    <span class="avatar-option">🎨</span><span class="avatar-option">🍕</span>
-                </div>
-            </div>
+                let item = document.createElement('div');
+                item.className = 'member-item';
 
-            <div class="form-group">
-                <label><strong>Nuevo Apodo:</strong></label>
-                <input type="text" id="settings-username" placeholder="Tu apodo" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
-            </div>
+                // Generar Botones de Acción según la jerarquía de roles
+                let actionButtons = '';
 
-            <div class="form-group">
-                <button id="btn-save-settings" class="primary-btn" style="max-width: 220px;">Guardar Cambios</button>
-                <button id="btn-logout" class="action-btn" style="background: #ef4444; max-width: 220px; margin-top: 15px;">Cerrar Sesión</button>
-            </div>
-        </div>
-    </div>
+                if (!isMe) {
+                    // Si el usuario actual es el CREADOR PRINCIPAL
+                    if (myRole === 'creator') {
+                        if (member.role === 'admin') {
+                            actionButtons += `<button class="btn-warning" onclick="demoteToMember('${group.id}', '${member.userId}')">Quitar Admin</button>`;
+                            actionButtons += `<button class="btn-danger" onclick="kickMember('${group.id}', '${member.userId}')">Expulsar</button>`;
+                        } else if (member.role === 'member') {
+                            actionButtons += `<button class="btn-success" onclick="promoteToAdmin('${group.id}', '${member.userId}')">Hacer Admin</button>`;
+                            actionButtons += `<button class="btn-danger" onclick="kickMember('${group.id}', '${member.userId}')">Expulsar</button>`;
+                        }
+                    }
+                    // Si el usuario actual es un ADMINISTRADOR SECUNDARIO
+                    else if (myRole === 'admin') {
+                        if (member.role === 'member') {
+                            actionButtons += `<button class="btn-success" onclick="promoteToAdmin('${group.id}', '${member.userId}')">Hacer Admin</button>`;
+                            actionButtons += `<button class="btn-danger" onclick="kickMember('${group.id}', '${member.userId}')">Expulsar</button>`;
+                        }
+                        // Los admins secundarios NO pueden expulsar ni cambiar al Creador ni a otros Admins
+                    }
+                }
 
-    <!-- Modal Encuestas -->
-    <div id="poll-modal" class="modal hidden flex-center">
-        <div class="modal-card">
-            <h3>Crear Encuesta</h3>
-            <input type="text" id="poll-question" placeholder="Pregunta" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
-            <input type="text" id="poll-opt1" placeholder="Opción 1" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
-            <input type="text" id="poll-opt2" placeholder="Opción 2" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
-            <input type="text" id="poll-opt3" placeholder="Opción 3 (Opcional)" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
-            <div style="display: flex; gap: 8px;">
-                <button id="btn-send-poll" class="primary-btn">Crear</button>
-                <button id="btn-close-poll" class="action-btn" style="background:#64748b;">Cancelar</button>
-            </div>
-        </div>
-    </div>
+                item.innerHTML = `
+                    <div class="member-info">
+                        <strong>${escapeHTML(userObj.name)} ${isMe ? '(Tú)' : ''}</strong>
+                        <span class="role-badge ${getRoleClass(member.role)}">${getRoleLabel(member.role)}</span>
+                    </div>
+                    <div class="member-actions">
+                        ${actionButtons}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
 
-    <!-- Modal Configuración del Grupo -->
-    <div id="group-info-modal" class="modal hidden flex-center">
-        <div class="modal-card" style="width: 400px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 id="group-info-title">Opciones del Grupo</h3>
-                <button id="btn-close-group-info" class="icon-btn">❌</button>
-            </div>
+        // --- ACCIONES DE MIEMBROS (Hacer Admin, Quitar Admin, Expulsar) ---
+        function promoteToAdmin(groupId, targetUserId) {
+            const group = groups.find(g => g.id === groupId);
+            if (!group) return;
 
-            <div id="admin-requests-section" class="hidden" style="border: 1px dashed #f59e0b; padding: 10px; border-radius: 8px; background: rgba(245, 158, 11, 0.1);">
-                <strong style="color: #f59e0b;">Solicitudes Pendientes:</strong>
-                <div id="group-requests-list" style="margin-top: 5px;"></div>
-            </div>
+            let target = group.members.find(m => m.userId === targetUserId);
+            if (target) {
+                target.role = 'admin';
+                saveData();
+                renderMembersList(group, getMyRole(group));
+                alert('El miembro fue ascendido a Administrador.');
+            }
+        }
 
-            <div>
-                <strong>Miembros del Grupo:</strong>
-                <div id="group-members-list" style="margin-top: 8px; max-height: 180px; overflow-y: auto;"></div>
-            </div>
+        function demoteToMember(groupId, targetUserId) {
+            const group = groups.find(g => g.id === groupId);
+            if (!group) return;
 
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-                <button id="btn-leave-group" class="action-btn" style="background: #ef4444;">🚪 Salir del Grupo</button>
-                <button id="btn-delete-group" class="action-btn hidden" style="background: #b91c1c;">💥 Eliminar Grupo (Solo Admin)</button>
-            </div>
-        </div>
-    </div>
+            let target = group.members.find(m => m.userId === targetUserId);
+            if (target && target.role !== 'creator') {
+                target.role = 'member';
+                saveData();
+                renderMembersList(group, getMyRole(group));
+                alert('Se han removido los permisos de Administrador.');
+            }
+        }
 
-    <script src="script.js"></script>
+        function kickMember(groupId, targetUserId) {
+            const group = groups.find(g => g.id === groupId);
+            if (!group) return;
+
+            if (confirm('¿Estás seguro de expulsar a este usuario del grupo?')) {
+                group.members = group.members.filter(m => m.userId !== targetUserId);
+                saveData();
+                renderMembersList(group, getMyRole(group));
+                renderSidebar();
+                renderChatHeader();
+            }
+        }
+
+        function leaveCurrentGroup() {
+            const group = groups.find(g => g.id === activeGroupId);
+            if (!group) return;
+
+            let myRole = getMyRole(group);
+            if (myRole === 'creator' && group.members.length > 1) {
+                alert('Como Creador Principal, no puedes salir del grupo sin antes eliminar el grupo o delegarlo.');
+                return;
+            }
+
+            if (confirm('¿Deseas salir de este grupo?')) {
+                group.members = group.members.filter(m => m.userId !== currentUserId);
+                saveData();
+                closeFullscreenSettings();
+                activeGroupId = null;
+                renderSidebar();
+                renderChatHeader();
+                renderMessages();
+            }
+        }
+
+        // --- UTILIDADES DE ROL ---
+        function getMyRole(group) {
+            let m = group.members.find(m => m.userId === currentUserId);
+            return m ? m.role : null;
+        }
+
+        function getRoleLabel(role) {
+            if (role === 'creator') return 'Creador (Admin Principal)';
+            if (role === 'admin') return 'Administrador';
+            return 'Miembro';
+        }
+
+        function getRoleClass(role) {
+            if (role === 'creator') return 'role-creator';
+            if (role === 'admin') return 'role-admin';
+            return 'role-member';
+        }
+
+        function escapeHTML(str) {
+            return String(str).replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+
+        // --- FUNCIONES EXTRA: CREAR Y BUSCAR GRUPOS ---
+        function openCreateGroupModal() {
+            let name = prompt('Ingresa el nombre del nuevo grupo:');
+            if (!name) return;
+
+            let newGroup = {
+                id: 'group_' + Date.now(),
+                name: name,
+                avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
+                creatorId: currentUserId,
+                members: [{ userId: currentUserId, role: 'creator' }],
+                pendingRequests: [],
+                messages: [{ senderId: currentUserId, text: 'Grupo creado exitosamente.', time: 'Ahora' }]
+            };
+
+            groups.push(newGroup);
+            saveData();
+            selectGroup(newGroup.id);
+        }
+
+        function openExploreModal() {
+            let availableGroups = groups.filter(g => 
+                !g.members.some(m => m.userId === currentUserId) &&
+                (!g.pendingRequests || !g.pendingRequests.includes(currentUserId))
+            );
+
+            if (availableGroups.length === 0) {
+                alert('No hay otros grupos disponibles para solicitar unirse.');
+                return;
+            }
+
+            let groupNames = availableGroups.map((g, idx) => `${idx + 1}. ${g.name}`).join('\n');
+            let choice = prompt(`Selecciona el número del grupo al que deseas enviar solicitud:\n${groupNames}`);
+            let index = parseInt(choice) - 1;
+
+            if (!isNaN(index) && availableGroups[index]) {
+                let targetGroup = availableGroups[index];
+                if (!targetGroup.pendingRequests) targetGroup.pendingRequests = [];
+                targetGroup.pendingRequests.push(currentUserId);
+                saveData();
+                alert(`Solicitud enviada al grupo "${targetGroup.name}". Espera a que un administrador te acepte.`);
+            }
+        }
+    </script>
 </body>
 </html>
