@@ -392,7 +392,7 @@ function appendMessage(msg) {
         pollHtml += '</div>';
     }
 
-    // CABECERA DEL MENSAJE (FOTO + NOMBRE ARRIBA DE CADA MENSAJE EN GRUPOS)
+  // CABECERA DEL MENSAJE (FOTO + NOMBRE ARRIBA DE CADA MENSAJE EN GRUPOS)
     let headerHtml = '';
     const animalTag = animalIcons[shapeClass] ? `<span class="animal-badge">${animalIcons[shapeClass]}</span>` : '';
 
@@ -406,9 +406,10 @@ function appendMessage(msg) {
             avTag = `<span style="font-size:0.9rem; margin-right:4px;">${av}</span>`;
         }
         
-        headerHtml = `<div class="msg-header-info" style="display:flex; align-items:center; gap:4px; font-weight:bold; font-size:0.75rem; margin-bottom:3px; opacity:0.9;">
+        // Muestra siempre Foto + Nombre del remitente
+        headerHtml = `<div class="msg-header-info" style="display:flex; align-items:center; gap:4px; font-weight:bold; font-size:0.8rem; margin-bottom:4px; color: #ffffff;">
             ${avTag}
-            <span class="msg-sender">${msg.sender_name || 'Usuario'}</span> 
+            <span>${msg.sender_name || 'Usuario'}</span> 
             ${animalTag}
         </div>`;
     } else if (animalTag) {
