@@ -765,3 +765,11 @@ socket.on('group:search_results', (results) => {
 });
 
 socket.on('group:request_sent', () => alert("Solicitud de ingreso enviada al administrador del grupo."));
+// Pedir permiso para notificaciones
+if ('Notification' in window && 'serviceWorker' in navigator) {
+  Notification.requestPermission().then(permission => {
+    if (permission === 'granted') {
+      console.log('Permiso de notificaciones concedido.');
+    }
+  });
+}
