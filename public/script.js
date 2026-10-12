@@ -765,11 +765,28 @@ socket.on('group:search_results', (results) => {
 });
 
 socket.on('group:request_sent', () => alert("Solicitud de ingreso enviada al administrador del grupo."));
-// Pedir permiso para notificaciones
+// Pedir permiso y registrar suscripción Push
 if ('Notification' in window && 'serviceWorker' in navigator) {
-  Notification.requestPermission().then(permission => {
+  Notification.requestPermission().then(async (permission) => {
     if (permission === 'granted') {
       console.log('Permiso de notificaciones concedido.');
+      
+      const register = await navigator.serviceWorker.ready;
+      
+      // Suscribir al usuario con la clave pública VAPID
+      const subscription = await register.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: 'AQUÍ_VA_TU_PUBLIC_KEY_DE_VAPID' // Reemplaza esto con tu VAPID_PUBLIC_KEY
+      });
+
+      // Enviar la suscripción a tu servidor Render
+      await fetch('/subscribe', {
+        method: 'POST',
+        body: JSON.stringify(subscription),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
     }
   });
 }

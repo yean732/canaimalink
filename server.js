@@ -1,3 +1,12 @@
+const webpush = require('web-push');
+
+// Configurar tus llaves VAPID que guardaste en Render
+webpush.setVapidDetails(
+  'mailto:tu-correo@example.com', 
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -8,7 +17,22 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 3e7 }); // 30MB
 
-// Cadena de conexión a Supabase (reemplaza con tu URI exacta de Supabase)
+// 1. IMPORTANTE: Habilitar lectura de JSON en Express para las suscripciones
+app.use(express.json());
+
+// Variable para almacenar los dispositivos que recibirán notificaciones
+let pushSubscriptions = [];
+
+// Ruta para recibir y guardar la suscripción del navegador
+app.post('/subscribe', (req, res) => {
+  const subscription = req.body;
+  if (!pushSubscriptions.some(sub => sub.endpoint === subscription.endpoint)) {
+    pushSubscriptions.push(subscription);
+  }
+  res.status(201).json({ status: 'ok' });
+});
+
+// Cadena de conexión a Supabase
 const connectionString = process.env.DATABASE_URL || 'AQUI_VA_TU_URI_DE_SUPABASE';
 
 const pool = new Pool({
@@ -175,6 +199,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 2. INTEGRADO CORRECTAMENTE AQUÍ DENTRO DE message:send
     socket.on('message:send', async ({ targetId, isGroup, content, mediaUrl, mediaType, pollData }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -204,6 +229,19 @@ io.on('connection', (socket) => {
                 const targetSockets = onlineUsers.get(parseInt(targetId));
                 if (targetSockets) targetSockets.forEach(sId => io.to(sId).emit('message:received', msgData));
             }
+
+            // --- DISPARAR NOTIFICACIÓN PUSH A DISPOSITIVOS EN SEGUNDO PLANO ---
+            const payload = JSON.stringify({
+                title: `Mensaje de ${u.username}`,
+                body: content || 'Te han enviado un archivo o contenido nuevo.'
+            });
+
+            pushSubscriptions.forEach(sub => {
+                webpush.sendNotification(sub, payload).catch(err => {
+                    console.error('Error al enviar notificación push:', err);
+                });
+            });
+
         } catch (e) {
             console.error("Error al enviar mensaje:", e);
         }
@@ -412,11 +450,6 @@ io.on('connection', (socket) => {
         broadcastOnlineState();
     });
 });
-
-// Configurar Render para usar la variable de entorno DATABASE_URL
-if (process.env.RENDER) {
-    // Render asignará DATABASE_URL automáticamente
-}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log("🚀 Servidor MÁAY corriendo en el puerto " + PORT));
