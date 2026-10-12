@@ -1,19 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background 0.2s, color 0.2s; }
 
-:root {
+:root 
     --bg-app: #f0f4f8; --sidebar-bg: #ffffff; --header-bg: #3a86ff;
     --header-text: #ffffff; --chat-bg: #eef2f5; --text-primary: #1e293b;
     --border-color: #e2e8f0; --input-bg: #f8fafc; --bubble-my-color: #3a86ff;
     --chat-font-size: 0.95rem; --msg-gap: 10px; --custom-chat-bg: none;
 }
 
-.theme-dark {
+.theme-dark { 
     --bg-app: #0b132b; --sidebar-bg: #1c2541; --header-bg: #1c2541;
     --header-text: #48cae4; --chat-bg: #0b132b; --text-primary: #f1f5f9;
     --border-color: #334155; --input-bg: #0b132b;
 }
 
-body { background: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; overflow: hidden; }
+body body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Color Emoji", sans-serif;
+} background: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; overflow: hidden; }
 .app-container { width: 100vw; height: 100vh; display: flex; position: relative; }
 
 /* Sidebar */
