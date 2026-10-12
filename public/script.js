@@ -19,6 +19,7 @@ function playTone(freq, duration) {
 function playChatSound() { playTone(800, 0.15); }
 function playGroupSound() { playTone(500, 0.25); }
 
+// Desbloquear audio con el primer clic del usuario
 document.addEventListener('click', () => {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
@@ -765,28 +766,48 @@ socket.on('group:search_results', (results) => {
 });
 
 socket.on('group:request_sent', () => alert("Solicitud de ingreso enviada al administrador del grupo."));
-// Pedir permiso y registrar suscripción Push
-if ('Notification' in window && 'serviceWorker' in navigator) {
-  Notification.requestPermission().then(async (permission) => {
-    if (permission === 'granted') {
-      console.log('Permiso de notificaciones concedido.');
-      
-      const register = await navigator.serviceWorker.ready;
-      
-      // Suscribir al usuario con la clave pública VAPID
-      const subscription = await register.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: 'AQUÍ_VA_TU_PUBLIC_KEY_DE_VAPID' // Reemplaza esto con tu VAPID_PUBLIC_KEY
-      });
 
-      // Enviar la suscripción a tu servidor Render
-      await fetch('/subscribe', {
-        method: 'POST',
-        body: JSON.stringify(subscription),
-        headers: {
-          'Content-Type': 'application/json'
+// ==========================================
+// REGISTRO DE NOTIFICACIONES PUSH (WHATSAPP STYLE)
+// ==========================================
+if ('Notification' in window && 'serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                const registration = await navigator.serviceWorker.ready;
+                
+               // NOTA: Reemplaza esta clave con la "Public Key" que generaste con npx web-push generate-vapid-keys
+                const publicVapidKey = 'BK3CqzE91hZIBey1rmeizI_WQZxDv7mgNEJnHrFNnx0l13hupb_R58jUwRHZ_Qu99GNMXzmXbgX9Hn7oAVVP3lQ';
+                
+                if (publicVapidKey && publicVapidKey !== 'AQUI_PEGA_TU_PUBLIC_KEY_DE_VAPID') {
+                    const subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                    });
+
+                    await fetch('/subscribe', {
+                        method: 'POST',
+                        body: JSON.stringify(subscription),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    console.log('✅ Suscripción de notificaciones push registrada con éxito.');
+                }
+            }
+        } catch (err) {
+            console.error('Error al registrar notificaciones push:', err);
         }
-      });
+    });
+}
+
+// Función auxiliar para convertir la clave VAPID
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
     }
-  });
+    return outputArray;
 }
