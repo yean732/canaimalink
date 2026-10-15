@@ -1,37 +1,21 @@
-// Sonido estilo WhatsApp (Doble "Plim")
+// Sonido nítido y moderno estilo notificación
 function playWhatsAppTone() {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
         
-        // Primer tono (más agudo)
-        const osc1 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.value = 1200; // Frecuencia alta estilo WhatsApp
-        osc1.connect(gain1);
-        gain1.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 1500; // Tono mucho más agudo y brillante tipo "plim"
         
-        // Segundo tono (ligeramente después y más alto)
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.value = 1760; // Nota más brillante
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
         const now = ctx.currentTime;
-        
-        // Reproducir primer tono breve
-        osc1.start(now);
-        gain1.gain.setValueAtTime(0.15, now);
-        gain1.gain.exponentialRampToValueAtTime(0.00001, now + 0.08);
-        osc1.stop(now + 0.08);
-
-        // Reproducir segundo tono justo después
-        osc2.start(now + 0.09);
-        gain2.gain.setValueAtTime(0.2, now + 0.09);
-        gain2.gain.exponentialRampToValueAtTime(0.00001, now + 0.22);
-        osc2.stop(now + 0.22);
+        osc.start(now);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.00001, now + 0.18);
+        osc.stop(now + 0.18);
     } catch(e) {}
 }
 
