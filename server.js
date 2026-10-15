@@ -1,12 +1,3 @@
-const webpush = require('web-push');
-
-// Configurar tus llaves VAPID que guardaste en Render
-webpush.setVapidDetails(
-  'mailto:tu-correo@example.com', 
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -17,22 +8,6 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 3e7 }); // 30MB
 
-// 1. IMPORTANTE: Habilitar lectura de JSON en Express para las suscripciones
-app.use(express.json());
-
-// Variable para almacenar los dispositivos que recibirán notificaciones
-let pushSubscriptions = [];
-
-// Ruta para recibir y guardar la suscripción del navegador
-app.post('/subscribe', (req, res) => {
-  const subscription = req.body;
-  if (!pushSubscriptions.some(sub => sub.endpoint === subscription.endpoint)) {
-    pushSubscriptions.push(subscription);
-  }
-  res.status(201).json({ status: 'ok' });
-});
-
-// Cadena de conexión a Supabase
 const connectionString = process.env.DATABASE_URL || 'AQUI_VA_TU_URI_DE_SUPABASE';
 
 const pool = new Pool({
@@ -40,7 +15,6 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-// Inicialización de Tablas en PostgreSQL
 async function initDb() {
     try {
         await pool.query(`
@@ -94,7 +68,7 @@ async function initDb() {
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log("✅ Base de datos Supabase (PostgreSQL) conectada e inicializada con éxito");
+        console.log("✅ Base de datos Supabase conectada e inicializada");
     } catch (err) {
         console.error("❌ Error al inicializar Supabase:", err);
     }
@@ -178,7 +152,6 @@ io.on('connection', (socket) => {
     socket.on('typing:start', ({ targetId, isGroup }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
-
         if (isGroup) {
             socket.to(`group_${targetId}`).emit('typing:show', { senderId: u.id, senderName: u.username, targetId, isGroup: true });
         } else {
@@ -190,7 +163,6 @@ io.on('connection', (socket) => {
     socket.on('typing:stop', ({ targetId, isGroup }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
-
         if (isGroup) {
             socket.to(`group_${targetId}`).emit('typing:hide', { senderId: u.id, targetId, isGroup: true });
         } else {
@@ -199,7 +171,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 2. INTEGRADO CORRECTAMENTE AQUÍ DENTRO DE message:send
     socket.on('message:send', async ({ targetId, isGroup, content, mediaUrl, mediaType, pollData }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
@@ -229,19 +200,6 @@ io.on('connection', (socket) => {
                 const targetSockets = onlineUsers.get(parseInt(targetId));
                 if (targetSockets) targetSockets.forEach(sId => io.to(sId).emit('message:received', msgData));
             }
-
-            // --- DISPARAR NOTIFICACIÓN PUSH A DISPOSITIVOS EN SEGUNDO PLANO ---
-            const payload = JSON.stringify({
-                title: `Mensaje de ${u.username}`,
-                body: content || 'Te han enviado un archivo o contenido nuevo.'
-            });
-
-            pushSubscriptions.forEach(sub => {
-                webpush.sendNotification(sub, payload).catch(err => {
-                    console.error('Error al enviar notificación push:', err);
-                });
-            });
-
         } catch (e) {
             console.error("Error al enviar mensaje:", e);
         }
@@ -250,7 +208,6 @@ io.on('connection', (socket) => {
     socket.on('chat:load_messages', async ({ targetId, isGroup }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
-
         try {
             let res;
             if (isGroup) {
@@ -274,7 +231,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // SISTEMA DE GRUPOS
     socket.on('group:create', async ({ groupName }) => {
         const u = activeSockets.get(socket.id);
         try {
@@ -330,14 +286,6 @@ io.on('connection', (socket) => {
     socket.on('group:accept_request', async ({ groupId, userId }) => {
         await pool.query(`INSERT INTO group_members (group_id, user_id, is_admin) VALUES ($1, $2, 0) ON CONFLICT DO NOTHING`, [groupId, userId]);
         await pool.query(`DELETE FROM group_requests WHERE group_id = $1 AND user_id = $2`, [groupId, userId]);
-
-        const targetSockets = onlineUsers.get(parseInt(userId));
-        if (targetSockets) {
-            targetSockets.forEach(sId => {
-                const clientSocket = io.sockets.sockets.get(sId);
-                if (clientSocket) clientSocket.join(`group_${groupId}`);
-            });
-        }
         io.to(`group_${groupId}`).emit('group:member_updated');
     });
 
@@ -361,7 +309,6 @@ io.on('connection', (socket) => {
         await pool.query(`DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`, [groupId, u.id]);
         socket.leave(`group_${groupId}`);
         socket.emit('group:left', { groupId });
-        loadUserData(socket, u.id);
     });
 
     socket.on('group:delete', async ({ groupId }) => {
@@ -370,17 +317,14 @@ io.on('connection', (socket) => {
         if (check.rows.length > 0 && check.rows[0].admin_id === u.id) {
             await pool.query(`DELETE FROM groups WHERE id = $1`, [groupId]);
             await pool.query(`DELETE FROM group_members WHERE group_id = $1`, [groupId]);
-            await pool.query(`DELETE FROM group_requests WHERE group_id = $1`, [groupId]);
             await pool.query(`DELETE FROM messages WHERE group_id = $1`, [groupId]);
             io.to(`group_${groupId}`).emit('group:deleted_broadcast', { groupId });
         }
     });
 
-    // Control de Encuestas
     socket.on('poll:vote', async ({ messageId, optionIdx }) => {
         const u = activeSockets.get(socket.id);
         if (!u) return;
-
         const res = await pool.query(`SELECT poll_data FROM messages WHERE id = $1`, [messageId]);
         if (res.rows.length === 0 || !res.rows[0].poll_data) return;
 
@@ -388,7 +332,6 @@ io.on('connection', (socket) => {
         if (!poll.voters) poll.voters = {};
 
         const previousVote = poll.voters[u.id];
-
         if (previousVote && previousVote.optionIdx === optionIdx) {
             delete poll.voters[u.id];
             poll.votes[optionIdx] = Math.max(0, (poll.votes[optionIdx] || 1) - 1);
