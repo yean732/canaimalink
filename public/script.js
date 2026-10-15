@@ -1,4 +1,4 @@
-// Sonido nítido y moderno estilo notificación
+// Sonido nítido y moderno estilo notificación (Versión Única)
 function playWhatsAppTone() {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -6,7 +6,7 @@ function playWhatsAppTone() {
         const gain = ctx.createGain();
         
         osc.type = 'sine';
-        osc.frequency.value = 1500; // Tono mucho más agudo y brillante tipo "plim"
+        osc.frequency.value = 1500; // Tono agudo y brillante tipo "plim"
         
         osc.connect(gain);
         gain.connect(ctx.destination);
@@ -29,32 +29,6 @@ document.addEventListener('click', () => {
 }, { once: true });
 
 const socket = io();
-
-// Notificaciones de Sonido
-function playTone(freq, duration) {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
-        osc.stop(ctx.currentTime + duration);
-    } catch(e) {}
-}
-
-function playChatSound() { playTone(800, 0.15); }
-function playGroupSound() { playTone(500, 0.25); }
-
-// Desbloquear audio con el primer clic del usuario
-document.addEventListener('click', () => {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
-}, { once: true });
-
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
 let currentUser = null;
