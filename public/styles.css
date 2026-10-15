@@ -188,7 +188,14 @@ audio { max-width: 220px; height: 35px; }
 .hidden { display: none !important; }
 .error-msg { color: #ef4444; font-size: 0.8rem; text-align: center; }
 
-/* Corrección de color para números y texto en el tema claro */
-body.theme-light, .list-item, input, select, textarea {
-    color: var(--text-primary) !important;
+/* Forzar que las horas de los mensajes, contadores y avatares se vean nítidos y oscuros en tema claro */
+body.theme-light .msg-meta,
+body.theme-light .avatar-selector,
+body.theme-light .form-group span,
+body.theme-light .form-group label,
+body.theme-light span[style*="font-size:0.75rem"],
+body.theme-light span[style*="font-size:0.8rem"],
+body.theme-light .voters-list {
+    color: #475569 !important; /* Un gris oscuro elegante y perfectamente legible */
+    opacity: 1 !important;
 }

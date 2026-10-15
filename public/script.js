@@ -1,23 +1,44 @@
-// Generador de sonido para notificaciones
-function playTone(freq, duration) {
+// Sonido estilo WhatsApp (Doble "Plim")
+function playWhatsAppTone() {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
-        osc.stop(ctx.currentTime + duration);
+        
+        // Primer tono (más agudo)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.value = 1200; // Frecuencia alta estilo WhatsApp
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        
+        // Segundo tono (ligeramente después y más alto)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.value = 1760; // Nota más brillante
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+
+        const now = ctx.currentTime;
+        
+        // Reproducir primer tono breve
+        osc1.start(now);
+        gain1.gain.setValueAtTime(0.15, now);
+        gain1.gain.exponentialRampToValueAtTime(0.00001, now + 0.08);
+        osc1.stop(now + 0.08);
+
+        // Reproducir segundo tono justo después
+        osc2.start(now + 0.09);
+        gain2.gain.setValueAtTime(0.2, now + 0.09);
+        gain2.gain.exponentialRampToValueAtTime(0.00001, now + 0.22);
+        osc2.stop(now + 0.22);
     } catch(e) {}
 }
 
-function playChatSound() { playTone(800, 0.15); }
-function playGroupSound() { playTone(500, 0.25); }
+function playChatSound() { playWhatsAppTone(); }
+function playGroupSound() { playWhatsAppTone(); }
 
-// Desbloquear el reproductor de audio con la primera interacción del usuario
+// Desbloquear audio con el primer clic
 document.addEventListener('click', () => {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
