@@ -1,13 +1,13 @@
 // --- SISTEMA DE SONIDOS MÁAY ---
 
-// 1. Sonido al ENVIAR mensaje (Tono grave corto "puu")
+// 1. Sonido al ENVIAR mensaje (Tono grave corto "puu" - Se mantiene igual)
 function playSendSound() {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.value = 450; // Frecuencia grave estilo "puu"
+        osc.frequency.value = 450;
         osc.connect(gain);
         gain.connect(ctx.destination);
         const now = ctx.currentTime;
@@ -18,39 +18,31 @@ function playSendSound() {
     } catch(e) {}
 }
 
-// 2. Sonido al RECIBIR mensaje (Estilo Redmi K50 Pro - Cristal/Gota)
+// 2. Sonido al RECIBIR mensaje (Efecto Redmi: Gota de Agua / Burbuja Orgánica)
 function playRedmiNotificationSound() {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const now = ctx.currentTime;
 
-        // Nota principal cristalina (Gota)
-        const osc1 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(1760, now); // Nota La alta
-        osc1.frequency.exponentialRampToValueAtTime(2640, now + 0.08); // Salto rápido tipo gota
-        osc1.connect(gain1);
-        gain1.connect(ctx.destination);
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = 'sine';
 
-        // Eco suave de cristal
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(2100, now + 0.04);
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
+        // Salto ultra rápido de frecuencia para crear el efecto "plop/gota"
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(2400, now + 0.06);
 
-        // Tiempos
-        osc1.start(now);
-        gain1.gain.setValueAtTime(0.25, now);
-        gain1.gain.exponentialRampToValueAtTime(0.00001, now + 0.15);
-        osc1.stop(now + 0.15);
+        // Volumen envuelto suave estilo agua
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0.25, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
 
-        osc2.start(now + 0.04);
-        gain2.gain.setValueAtTime(0.1, now + 0.04);
-        gain2.gain.exponentialRampToValueAtTime(0.00001, now + 0.22);
-        osc2.stop(now + 0.22);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
     } catch(e) {}
 }
 
