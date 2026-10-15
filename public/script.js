@@ -1,3 +1,28 @@
+// Generador de sonido para notificaciones
+function playTone(freq, duration) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+        osc.stop(ctx.currentTime + duration);
+    } catch(e) {}
+}
+
+function playChatSound() { playTone(800, 0.15); }
+function playGroupSound() { playTone(500, 0.25); }
+
+// Desbloquear el reproductor de audio con la primera interacción del usuario
+document.addEventListener('click', () => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+}, { once: true });
+
 const socket = io();
 
 // Notificaciones de Sonido
@@ -328,10 +353,12 @@ socket.on('message:received', (msg) => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
+    // --- AGREGAR ESTO AQUÍ ---
     if (currentUser && msg.sender_id !== currentUser.id) {
         if (msg.group_id) playGroupSound();
         else playChatSound();
     }
+    // -------------------------
 });
 
 // Iconos de Animales

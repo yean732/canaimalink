@@ -187,3 +187,8 @@ audio { max-width: 220px; height: 35px; }
 
 .hidden { display: none !important; }
 .error-msg { color: #ef4444; font-size: 0.8rem; text-align: center; }
+
+/* Corrección de color para números y texto en el tema claro */
+body.theme-light, .list-item, input, select, textarea {
+    color: var(--text-primary) !important;
+}
