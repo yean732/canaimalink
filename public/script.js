@@ -1,6 +1,4 @@
-// --- SISTEMA DE SONIDOS MÁAY (COMPATIBLE CON LINUX / CANAIMA / ANDROID) ---
-
-// Instancia única global para Web Audio API
+// --- SISTEMA DE AUDIO REFORZADO MÁAY ---
 let audioCtx = null;
 
 function getAudioContext() {
@@ -13,14 +11,11 @@ function getAudioContext() {
     return audioCtx;
 }
 
-// Desbloquear el contexto de audio con cualquier interacción del usuario
-['click', 'touchstart', 'keydown'].forEach(eventType => {
-    document.addEventListener(eventType, () => {
-        getAudioContext();
-    }, { once: true });
-});
+// Activar audio en el primer toque de cualquier parte de la app
+document.addEventListener('pointerdown', () => {
+    getAudioContext();
+}, { once: true });
 
-// 1. Sonido al ENVIAR mensaje (Tono grave corto "puu")
 function playSendSound() {
     try {
         const ctx = getAudioContext();
@@ -32,38 +27,35 @@ function playSendSound() {
         gain.connect(ctx.destination);
         const now = ctx.currentTime;
         osc.start(now);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.00001, now + 0.12);
-        osc.stop(now + 0.12);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.00001, now + 0.15);
+        osc.stop(now + 0.15);
     } catch(e) {
-        console.log('Error reproduciendo sonido de envio:', e);
+        console.log('Audio send error:', e);
     }
 }
 
-// 2. Sonido al RECIBIR mensaje (Gota de agua estilo Redmi)
 function playRedmiNotificationSound() {
     try {
         const ctx = getAudioContext();
         const now = ctx.currentTime;
-
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         
         osc.type = 'sine';
         osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(2400, now + 0.06);
+        osc.frequency.exponentialRampToValueAtTime(2400, now + 0.08);
 
         gain.gain.setValueAtTime(0.01, now);
-        gain.gain.linearRampToValueAtTime(0.25, now + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+        gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
-
         osc.start(now);
-        osc.stop(now + 0.12);
+        osc.stop(now + 0.15);
     } catch(e) {
-        console.log('Error reproduciendo sonido de recepcion:', e);
+        console.log('Audio receive error:', e);
     }
 }
 
