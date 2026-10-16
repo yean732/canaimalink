@@ -324,3 +324,68 @@ button, .send-btn, .mic-btn, .attach-btn, .emoji-btn {
         padding: 0 !important;
     }
 }
+
+/* --- BLOQUEO TOTAL DE ZOOM Y ARREGLO DE BARRA MÓVIL (MÁAY) --- */
+
+/* 1. Bloquear gestos de zoom y movimiento lateral en móviles */
+html, body {
+    touch-action: pan-x pan-y !important;
+    -webkit-text-size-adjust: 100% !important;
+    overflow-x: hidden !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+}
+
+/* 2. Forzar que la pantalla del chat se ajuste al tamaño real del celular */
+.chat-container, #chat-window, .chat-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* 3. Acomodar la barra inferior de chat para que no se estire de más */
+footer, .chat-footer, .message-input-area, .chat-input-container {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    min-height: 50px !important;
+    max-height: 65px !important;
+    padding: 5px 10px !important;
+    background: #1e1e2e !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
+}
+
+/* El cuadro de texto no deforma la barra */
+footer input, .chat-input-container input, .message-input-area input {
+    flex: 1 !important;
+    height: 38px !important;
+    font-size: 16px !important;
+    margin: 0 5px !important;
+    border-radius: 20px !important;
+}
+
+/* Botones alineados y sin salirse */
+footer button, .chat-input-container button, .message-input-area button {
+    width: 38px !important;
+    height: 38px !important;
+    flex-shrink: 0 !important;
+}
+
+/* 4. Forzar que cualquier botón al inicio del header actúe como flecha de retroceso en móviles */
+@media (max-width: 768px) {
+    header button:first-child, .chat-header button:first-child, .back-btn {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        font-size: 24px !important;
+        margin-right: 8px !important;
+    }
+}
