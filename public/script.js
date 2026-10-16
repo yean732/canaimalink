@@ -1,66 +1,22 @@
-// --- SISTEMA DE AUDIO REFORZADO MÁAY ---
-let audioCtx = null;
-
-function getAudioContext() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-    return audioCtx;
-}
-
-// Activar audio en el primer toque de cualquier parte de la app
-document.addEventListener('pointerdown', () => {
-    getAudioContext();
-}, { once: true });
-
+// Tono de envío más claro y audible (frecuencia más alta y mayor ganancia)
 function playSendSound() {
     try {
         const ctx = getAudioContext();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.value = 450;
+        osc.frequency.setValueAtTime(750, ctx.currentTime); // Subido de 450Hz a 750Hz para mayor claridad
         osc.connect(gain);
         gain.connect(ctx.destination);
         const now = ctx.currentTime;
         osc.start(now);
-        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.setValueAtTime(0.4, now); // Volumen subido a 0.4
         gain.gain.exponentialRampToValueAtTime(0.00001, now + 0.15);
         osc.stop(now + 0.15);
     } catch(e) {
         console.log('Audio send error:', e);
     }
 }
-
-function playRedmiNotificationSound() {
-    try {
-        const ctx = getAudioContext();
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(2400, now + 0.08);
-
-        gain.gain.setValueAtTime(0.01, now);
-        gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.15);
-    } catch(e) {
-        console.log('Audio receive error:', e);
-    }
-}
-
-function playChatSound() { playRedmiNotificationSound(); }
-function playGroupSound() { playRedmiNotificationSound(); }
 
 const socket = io();
 
@@ -863,4 +819,20 @@ if ('serviceWorker' in navigator) {
             .then(reg => console.log('Service Worker registrado con éxito', reg))
             .catch(err => console.log('Error al registrar Service Worker', err));
     });
+}
+
+// --- MANEJO DEL BOTÓN ATRÁS EN MÓVILES ---
+window.addEventListener('popstate', (event) => {
+    const chatWindow = document.querySelector('.chat-area') || document.querySelector('#chat-window');
+    if (chatWindow && chatWindow.classList.contains('active')) {
+        // Cierra la ventana del chat actual y muestra la lista de chats
+        chatWindow.classList.remove('active');
+        const backBtn = document.querySelector('.back-to-list-btn') || document.querySelector('#back-btn');
+        if (backBtn) backBtn.click();
+    }
+});
+
+// Al abrir un chat, agregar un estado al historial para interceptar el botón atrás
+function onOpenChat() {
+    history.pushState({ inChat: true }, '');
 }

@@ -266,3 +266,61 @@ button, .send-btn, .mic-btn, .attach-btn, .emoji-btn {
     align-items: center !important;
     justify-content: center !important;
 }
+
+/* --- CORRECCIÓN DE LAYOUT MÓVIL ESTILO WHATSAPP --- */
+
+/* Mostrar siempre el botón / flecha de regresar en el header en pantallas pequeñas */
+@media (max-width: 768px) {
+    .back-btn, .back-to-list-btn, #back-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-right: 10px !important;
+        font-size: 22px !important;
+        cursor: pointer !important;
+    }
+
+    /* Asegurar que el contenedor del chat use flexbox vertical estricto */
+    .chat-area, #chat-window {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+    }
+
+    /* La zona de mensajes toma el espacio restante */
+    .messages-container, .chat-messages {
+        flex: 1 !important;
+        overflow-y: auto !important;
+    }
+
+    /* Barra de entrada de texto fija abajo sin desbordamientos */
+    .chat-input-container, .message-input-area, footer.chat-footer {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        padding: 6px 10px !important;
+        background: #1e1e2e !important;
+        min-height: 50px !important;
+        max-height: 60px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Campo de texto ajustable */
+    .chat-input-container input, .message-input-area input {
+        flex: 1 !important;
+        min-width: 0 !important;
+        height: 40px !important;
+        font-size: 16px !important;
+        margin: 0 6px !important;
+    }
+
+    /* Botones de audio, emojis y enviar visibles y alineados */
+    .chat-input-container button, .message-input-area button {
+        flex-shrink: 0 !important;
+        width: 40px !important;
+        height: 40px !important;
+        padding: 0 !important;
+    }
+}
