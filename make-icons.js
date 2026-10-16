@@ -1,0 +1,7 @@
+const fs = require('fs');
+
+const svgContent = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='120' fill='#3a86ff'/><path d='M160 210c0-44.2 40.3-80 90-80s90 35.8 90 80-40.3 80-90 80c-13.8 0-26.8-3-38.3-8.4L150 295l10.2-32.5c-12.4-14.3-20.2-32.5-20.2-52.5z' fill='#ffffff'/><path d='M260 300c0-38.7 35.8-70 80-70s80 31.3 80 70-35.8 70-80 70c-12.2 0-23.8-2.6-34.1-7.3L250 375l9-28.5c-11-12.5-18-28.5-18-46.5z' fill='#6c5ce7' opacity='0.95'/></svg>`;
+
+fs.writeFileSync('icon-192.png', svgContent);
+fs.writeFileSync('icon-512.png', svgContent);
+console.log('¡Iconos icon-192.png e icon-512.png creados con éxito!');
