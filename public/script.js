@@ -1,9 +1,29 @@
-// --- SISTEMA DE SONIDOS MÁAY ---
+// --- SISTEMA DE SONIDOS MÁAY (COMPATIBLE CON LINUX / CANAIMA / ANDROID) ---
 
-// 1. Sonido al ENVIAR mensaje (Tono grave corto "puu" - Se mantiene igual)
+// Instancia única global para Web Audio API
+let audioCtx = null;
+
+function getAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
+// Desbloquear el contexto de audio con cualquier interacción del usuario
+['click', 'touchstart', 'keydown'].forEach(eventType => {
+    document.addEventListener(eventType, () => {
+        getAudioContext();
+    }, { once: true });
+});
+
+// 1. Sonido al ENVIAR mensaje (Tono grave corto "puu")
 function playSendSound() {
     try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = getAudioContext();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
@@ -15,25 +35,24 @@ function playSendSound() {
         gain.gain.setValueAtTime(0.15, now);
         gain.gain.exponentialRampToValueAtTime(0.00001, now + 0.12);
         osc.stop(now + 0.12);
-    } catch(e) {}
+    } catch(e) {
+        console.log('Error reproduciendo sonido de envio:', e);
+    }
 }
 
-// 2. Sonido al RECIBIR mensaje (Efecto Redmi: Gota de Agua / Burbuja Orgánica)
+// 2. Sonido al RECIBIR mensaje (Gota de agua estilo Redmi)
 function playRedmiNotificationSound() {
     try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = getAudioContext();
         const now = ctx.currentTime;
 
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         
         osc.type = 'sine';
-
-        // Salto ultra rápido de frecuencia para crear el efecto "plop/gota"
         osc.frequency.setValueAtTime(600, now);
         osc.frequency.exponentialRampToValueAtTime(2400, now + 0.06);
 
-        // Volumen envuelto suave estilo agua
         gain.gain.setValueAtTime(0.01, now);
         gain.gain.linearRampToValueAtTime(0.25, now + 0.015);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
@@ -43,17 +62,13 @@ function playRedmiNotificationSound() {
 
         osc.start(now);
         osc.stop(now + 0.12);
-    } catch(e) {}
+    } catch(e) {
+        console.log('Error reproduciendo sonido de recepcion:', e);
+    }
 }
 
 function playChatSound() { playRedmiNotificationSound(); }
 function playGroupSound() { playRedmiNotificationSound(); }
-
-// Desbloquear audio con el primer clic del usuario
-document.addEventListener('click', () => {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
-}, { once: true });
 
 const socket = io();
 
